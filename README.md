@@ -18,6 +18,6 @@ The pages are content fragments (their own CSS, data and script) that a site wra
 
 **Schedule.** `.github/workflows/daily.yml` runs at 00:40 UTC, once the previous UTC day is complete, and can be run by hand. The chain read is cached between runs (Actions cache); an empty cache starts from the `cache-seed` release.
 
-`.github/workflows/site-data.yml` runs at 11:15 and 14:15 UTC. It publishes `site-data/` only when every fetch succeeds, so the files there are always one consistent set. The stock-token cache (`data/stocks/`) is kept in the repo, so each day only reads the newest blocks and candles.
+`.github/workflows/site-data.yml` runs at 01:30 UTC, as soon as the previous UTC day has closed, with a retry at 04:30. It publishes `site-data/` only when every fetch succeeds and DefiLlama has the previous day, so the files there are always one consistent set. The set and the stock-token cache are assets on the `site-data` release, replaced on each run, so they don't grow the git history; `.github/workflows/pages.yml` deploys `docs/` plus the set to GitHub Pages.
 
 Describes on-chain behaviour; not investment advice.

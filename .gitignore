@@ -1,3 +1,5 @@
 data/flows_cache/
 data/latest/
+data/stocks/
+docs/site-data/
 __pycache__/

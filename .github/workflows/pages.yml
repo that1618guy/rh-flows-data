@@ -1,0 +1,48 @@
+name: Pages
+
+# Deploys the Pages site: docs/ from main (the Flows pages, committed by daily.yml) plus docs/site-data/ from the
+# site-data release asset (replaced by site-data.yml on each run, so the 17 MB set never goes into git history).
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Add site-data from its release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p docs/site-data
+          if gh release download site-data --pattern site-data.tar.gz --dir "$RUNNER_TEMP"; then
+            tar -xzf "$RUNNER_TEMP/site-data.tar.gz" -C docs/site-data
+          else
+            echo "::warning title=Pages::no site-data release asset yet"
+          fi
+          touch docs/.nojekyll
+          ls docs docs/site-data | head -40
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,7 +1,7 @@
 name: Flows data
 
 # Reads Robinhood Chain once a day and publishes four pages to docs/ (GitHub Pages):
-# flows.html, holders.html, smart.html and valuation.html, plus status.json.
+# flows.html, holders.html, smart.html and valuation.html, plus status.json (pages.yml deploys docs/).
 on:
   schedule:
     - cron: "40 0 * * *"      # 00:40 UTC: the previous UTC day is complete
@@ -144,3 +144,12 @@ jobs:
           git commit -m "Flows data $(date -u -d yesterday +%F)"
           git pull --rebase
           git push
+
+  pages:
+    needs: flows
+    if: always()
+    uses: ./.github/workflows/pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

@@ -2,16 +2,17 @@ name: Site data
 
 # The rate-limited public fetches for the State of Robinhood Chain site: DefiLlama (fetch.py, fetch_economies.py),
 # then the stock tokens from the chain RPC and GeckoTerminal (fetch_stocks.py), on the cutoff day derive.py sets.
-# Published to docs/site-data/ only when every step succeeds, so the files there are always one consistent set.
-# The stock cache (data/stocks) is kept in the repo, so each day only reads the newest blocks and candles.
+# Published at docs/site-data/ on the Pages site only when every step succeeds, so the files there are always one
+# consistent set, and only once DefiLlama has the previous UTC day (the cutoff); until then the last set stays. The set and the stock cache are release assets (release "site-data"), replaced on each run, so neither
+# grows the git history; pages.yml deploys the set to Pages.
 on:
   schedule:
-    - cron: "15 11 * * *"     # ~2 h before the site's 13:17 UTC run
-    - cron: "15 14 * * *"     # ~2 h before its 16:17 UTC backup run
+    - cron: "30 1 * * *"      # as early as the data allows: the cutoff is the previous UTC day, closed at 00:00
+    - cron: "30 4 * * *"      # retry: a failed run, or DefiLlama not having the previous day yet, tries again here
   workflow_dispatch:
 
 permissions:
-  contents: write             # to commit docs/site-data and the stock cache
+  contents: write             # to replace the release assets
 
 concurrency:
   group: site-data
@@ -30,6 +31,16 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Restore the stock cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/stocks
+          gh release download site-data --pattern stocks-cache.tar.gz --dir "$RUNNER_TEMP" \
+            && tar -xzf "$RUNNER_TEMP/stocks-cache.tar.gz" -C data/stocks \
+            || echo "::warning title=Site data::no stock cache in the release; fetch_stocks.py rebuilds it (slow)"
+          ls data/stocks | head
+
       - name: Fetch
         id: fetch
         env:
@@ -41,23 +52,39 @@ jobs:
           echo "FETCH_DATE=$FETCH_DATE" >> "$GITHUB_ENV"
           python scripts/fetch.py
           python scripts/derive.py
+          lfd=$(python -c "import json;print(json.load(open('data/latest/rh_series.json'))['last_full_day'])")
+          want=$(date -u -d yesterday +%F)
+          if [ "$lfd" != "$want" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Site data::DefiLlama has no full day for $want yet (last is $lfd); not published, the next run tries again"
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
           python scripts/fetch_stocks.py
           python scripts/fetch_economies.py
 
-      - name: Publish to docs/site-data
+      - name: Publish the set and the stock cache
         if: always()
         env:
-          OK: ${{ steps.fetch.outcome == 'success' }}
+          OK: ${{ steps.fetch.outcome == 'success' && steps.fetch.outputs.ready == 'true' }}
+          WHY: ${{ steps.fetch.outcome != 'success' && 'fetch failed' || 'previous day not on DefiLlama yet' }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p docs/site-data
+          out="$RUNNER_TEMP/site-data"; mkdir -p "$out"
+          gh release view site-data >/dev/null 2>&1 || gh release create site-data --title "Site data" \
+            --notes "Latest DefiLlama and stock-token set (site-data.tar.gz, served on Pages at /site-data/) and the stock cache (stocks-cache.tar.gz). Replaced on each run."
+          gh release download site-data --pattern site-data.tar.gz --dir "$RUNNER_TEMP/old" 2>/dev/null \
+            && tar -xzf "$RUNNER_TEMP/old/site-data.tar.gz" -C "$out" || true
           python - <<'PY'
           import datetime as dt, glob, json, os, shutil
-          out, ok = "docs/site-data", os.environ["OK"] == "true"
+          out, ok = os.path.join(os.environ["RUNNER_TEMP"], "site-data"), os.environ["OK"] == "true"
           sp = os.path.join(out, "status.json")
           old = json.load(open(sp)) if os.path.exists(sp) else {}
           now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          today = os.environ["FETCH_DATE"]
+          act = "publish"
           if ok:
-              for f in glob.glob(os.path.join(out, "*.json")):
+              for f in glob.glob(os.path.join(out, "*")):
                   os.remove(f)
               latest = sorted(os.path.basename(f) for f in glob.glob("data/latest/*.json"))
               stocks = ["supply_daily.json", "gt.json"]          # the stock cache files the site reads directly
@@ -66,20 +93,34 @@ jobs:
               for f in stocks:
                   shutil.copy(os.path.join("data/stocks", f), os.path.join(out, "stocks_" + f))
               S, St = json.load(open("data/latest/rh_series.json")), json.load(open("data/latest/stocks.json"))
-              st = {"ok": True, "built": now, "fetched": os.environ["FETCH_DATE"], "last_full_day": S["last_full_day"],
+              st = {"ok": True, "built": now, "fetched": today, "last_full_day": S["last_full_day"],
                     "stocks_cutoff": St["cutoff"], "stock_tokens_live": St["live"], "warnings": St.get("warnings") or [],
                     "files": {"latest": latest, "stocks": stocks}, "failures": []}
+          elif old.get("ok") and old.get("fetched") == today:
+              act, st = "keep", old                              # today's good set is already out: leave it alone
           else:
-              # keep the last good set; record the failure (the site fetches for itself when this isn't today's)
-              st = dict(old, ok=False, failed_at=now, failures=["fetch"])
-          json.dump(st, open(sp, "w"), indent=1)
-          print(json.dumps({k: v for k, v in st.items() if k != "files"}, indent=1))
+              act = "mark"                                       # the site fetches for itself when the set isn't today's
+              st = dict(old, ok=False, failed_at=now, failures=[os.environ["WHY"]])
+          if act != "keep":
+              json.dump(st, open(sp, "w"), indent=1)
+          open(os.path.join(os.environ["RUNNER_TEMP"], "act"), "w").write(act)
+          print(act, json.dumps({k: v for k, v in st.items() if k != "files"}, indent=1))
           PY
-          touch docs/.nojekyll
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs data/stocks
-          git diff --cached --quiet && exit 0
-          git commit -m "Site data $FETCH_DATE"
-          git pull --rebase
-          git push
+          act=$(cat "$RUNNER_TEMP/act")
+          if [ "$act" != keep ] && [ -f "$out/status.json" ]; then
+            tar -czf "$RUNNER_TEMP/site-data.tar.gz" -C "$out" .
+            gh release upload site-data "$RUNNER_TEMP/site-data.tar.gz" --clobber
+          fi
+          if [ "$act" = publish ]; then
+            tar -czf "$RUNNER_TEMP/stocks-cache.tar.gz" -C data/stocks .
+            gh release upload site-data "$RUNNER_TEMP/stocks-cache.tar.gz" --clobber
+          fi
+
+  pages:
+    needs: fetch
+    if: always()
+    uses: ./.github/workflows/pages.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
