@@ -10,11 +10,14 @@ https://that1618guy.github.io/rh-flows-data/
 | `smart.html` | What the most profitable wallets did yesterday (`smart_money.py`, `build_smart_page.py`) |
 | `valuation.html` | What the market pays for RH-native projects' revenue (`revenue_multiple.py`, `build_valuation_page.py`) |
 | `status.json` | Each page's as-of date, what it shows, and any step that failed |
+| `site-data/` | Raw public data for the site: DefiLlama (`fetch.py`, `fetch_economies.py`, `derive.py`) and stock tokens from the chain RPC and GeckoTerminal (`fetch_stocks.py`), with its own `status.json` |
 
 The pages are content fragments (their own CSS, data and script) that a site wraps in its own page shell.
 
 **Sources.** Robinhood Chain's public RPC, GeckoTerminal and DefiLlama. No keys or secrets.
 
 **Schedule.** `.github/workflows/daily.yml` runs at 00:40 UTC, once the previous UTC day is complete, and can be run by hand. The chain read is cached between runs (Actions cache); an empty cache starts from the `cache-seed` release.
+
+`.github/workflows/site-data.yml` runs at 11:15 and 14:15 UTC. It publishes `site-data/` only when every fetch succeeds, so the files there are always one consistent set. The stock-token cache (`data/stocks/`) is kept in the repo, so each day only reads the newest blocks and candles.
 
 Describes on-chain behaviour; not investment advice.

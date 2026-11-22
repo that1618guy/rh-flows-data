@@ -1,0 +1,85 @@
+name: Site data
+
+# The rate-limited public fetches for the State of Robinhood Chain site: DefiLlama (fetch.py, fetch_economies.py),
+# then the stock tokens from the chain RPC and GeckoTerminal (fetch_stocks.py), on the cutoff day derive.py sets.
+# Published to docs/site-data/ only when every step succeeds, so the files there are always one consistent set.
+# The stock cache (data/stocks) is kept in the repo, so each day only reads the newest blocks and candles.
+on:
+  schedule:
+    - cron: "15 11 * * *"     # ~2 h before the site's 13:17 UTC run
+    - cron: "15 14 * * *"     # ~2 h before its 16:17 UTC backup run
+  workflow_dispatch:
+
+permissions:
+  contents: write             # to commit docs/site-data and the stock cache
+
+concurrency:
+  group: site-data
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch
+        id: fetch
+        env:
+          PYTHONUNBUFFERED: "1"
+          DATA_DIR: data/latest
+          STOCKS_CACHE_DIR: data/stocks
+        run: |
+          export FETCH_DATE=$(date -u +%F)
+          echo "FETCH_DATE=$FETCH_DATE" >> "$GITHUB_ENV"
+          python scripts/fetch.py
+          python scripts/derive.py
+          python scripts/fetch_stocks.py
+          python scripts/fetch_economies.py
+
+      - name: Publish to docs/site-data
+        if: always()
+        env:
+          OK: ${{ steps.fetch.outcome == 'success' }}
+        run: |
+          mkdir -p docs/site-data
+          python - <<'PY'
+          import datetime as dt, glob, json, os, shutil
+          out, ok = "docs/site-data", os.environ["OK"] == "true"
+          sp = os.path.join(out, "status.json")
+          old = json.load(open(sp)) if os.path.exists(sp) else {}
+          now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          if ok:
+              for f in glob.glob(os.path.join(out, "*.json")):
+                  os.remove(f)
+              latest = sorted(os.path.basename(f) for f in glob.glob("data/latest/*.json"))
+              stocks = ["supply_daily.json", "gt.json"]          # the stock cache files the site reads directly
+              for f in latest:
+                  shutil.copy(os.path.join("data/latest", f), os.path.join(out, f))
+              for f in stocks:
+                  shutil.copy(os.path.join("data/stocks", f), os.path.join(out, "stocks_" + f))
+              S, St = json.load(open("data/latest/rh_series.json")), json.load(open("data/latest/stocks.json"))
+              st = {"ok": True, "built": now, "fetched": os.environ["FETCH_DATE"], "last_full_day": S["last_full_day"],
+                    "stocks_cutoff": St["cutoff"], "stock_tokens_live": St["live"], "warnings": St.get("warnings") or [],
+                    "files": {"latest": latest, "stocks": stocks}, "failures": []}
+          else:
+              # keep the last good set; record the failure (the site fetches for itself when this isn't today's)
+              st = dict(old, ok=False, failed_at=now, failures=["fetch"])
+          json.dump(st, open(sp, "w"), indent=1)
+          print(json.dumps({k: v for k, v in st.items() if k != "files"}, indent=1))
+          PY
+          touch docs/.nojekyll
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs data/stocks
+          git diff --cached --quiet && exit 0
+          git commit -m "Site data $FETCH_DATE"
+          git pull --rebase
+          git push

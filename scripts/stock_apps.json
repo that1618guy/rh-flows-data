@@ -1,0 +1,242 @@
+[
+ {
+  "slug": "arcus-perps",
+  "name": "Arcus",
+  "type": "Trading and perps",
+  "core": false
+ },
+ {
+  "slug": "fables",
+  "name": "Fables",
+  "type": "DEX",
+  "core": false
+ },
+ {
+  "slug": "goo-exchange-clmm",
+  "name": "Goo Exchange",
+  "type": "DEX",
+  "core": true
+ },
+ {
+  "slug": "raphael-exchange-cl",
+  "name": "Raphael Exchange",
+  "type": "DEX",
+  "core": false
+ },
+ {
+  "slug": "stockrip",
+  "name": "StockRip",
+  "type": "Game",
+  "core": true
+ },
+ {
+  "slug": "ripe-protocol",
+  "name": "Ripe Protocol",
+  "type": "Lending",
+  "core": false
+ },
+ {
+  "slug": "pare",
+  "name": "PARE",
+  "type": "Yield splitting",
+  "core": true
+ },
+ {
+  "slug": "raphael-exchange-amm",
+  "name": "Raphael Exchange",
+  "type": "DEX",
+  "core": false
+ },
+ {
+  "slug": "orvex",
+  "name": "Orvex",
+  "type": "DEX",
+  "core": false
+ },
+ {
+  "slug": "earn",
+  "name": "EARN",
+  "type": "Liquidity vault",
+  "core": true
+ },
+ {
+  "slug": "borro",
+  "name": "Borro",
+  "type": "Lending",
+  "core": true
+ },
+ {
+  "slug": "gage",
+  "name": "Gage",
+  "type": "Lending",
+  "core": false
+ },
+ {
+  "slug": "tickerspring-vaults",
+  "name": "TickerSpring Vaults",
+  "type": "Liquidity vault",
+  "core": true
+ },
+ {
+  "slug": "stockmon",
+  "name": "STOCKMON",
+  "type": "NFT vault",
+  "core": true
+ },
+ {
+  "slug": "orchard",
+  "name": "Orchard",
+  "type": "Game",
+  "core": true
+ },
+ {
+  "slug": "twofold",
+  "name": "Twofold",
+  "type": "DEX",
+  "core": false
+ },
+ {
+  "slug": "raisehood",
+  "name": "RaiseHood",
+  "type": "Launchpad",
+  "core": false
+ },
+ {
+  "slug": "tickerspring-baskets",
+  "name": "TickerSpring Baskets",
+  "type": "Index",
+  "core": true
+ },
+ {
+  "slug": "fake-wall-street",
+  "name": "Fake Wall Street",
+  "type": "Game",
+  "core": true
+ },
+ {
+  "slug": "tetravault",
+  "name": "TETRAVAULT",
+  "type": "Reserve token",
+  "core": false
+ },
+ {
+  "slug": "hedgehood-stock-yield",
+  "name": "HedgeHood Stock Yield",
+  "type": "Options vault",
+  "core": true
+ },
+ {
+  "slug": "bskts",
+  "name": "bskts",
+  "type": "Index",
+  "core": true
+ },
+ {
+  "slug": "fang",
+  "name": "Fang",
+  "type": "Stablecoin",
+  "core": false
+ },
+ {
+  "slug": "hoodbets",
+  "name": "Hoodbets",
+  "type": "Prediction market",
+  "core": true
+ },
+ {
+  "slug": "quiver-protocol",
+  "name": "Quiver Protocol",
+  "type": "Liquidity manager",
+  "core": false
+ },
+ {
+  "slug": "stax",
+  "name": "Stax",
+  "type": "Index",
+  "core": true
+ },
+ {
+  "slug": "stockless",
+  "name": "Stockless",
+  "type": "Liquidity manager",
+  "core": true
+ },
+ {
+  "slug": "solon-stocks",
+  "name": "Solon Stocks",
+  "type": "Stock-token issuer",
+  "core": true
+ },
+ {
+  "slug": "robinindex",
+  "name": "RobinIndex",
+  "type": "Index",
+  "core": true
+ },
+ {
+  "slug": "kicker",
+  "name": "kicker",
+  "type": "Yield vault",
+  "core": false
+ },
+ {
+  "slug": "oter-finance",
+  "name": "Oter Finance",
+  "type": "Lending",
+  "core": true
+ },
+ {
+  "slug": "peddles",
+  "name": "Peddles",
+  "type": "Launchpad",
+  "core": false
+ },
+ {
+  "slug": "stelx",
+  "name": "STELX",
+  "type": "Privacy pool",
+  "core": false
+ },
+ {
+  "slug": "hood-index",
+  "name": "Hood Index",
+  "type": "Index",
+  "core": true
+ },
+ {
+  "slug": "vs-trade",
+  "name": "VS Trade",
+  "type": "Trading and perps",
+  "core": true
+ },
+ {
+  "slug": "kyros-finance",
+  "name": "Kyros Finance",
+  "type": "Lending",
+  "core": false
+ },
+ {
+  "slug": "stonkpress",
+  "name": "StonkPress",
+  "type": "Stablecoin",
+  "core": true
+ },
+ {
+  "slug": "overcall",
+  "name": "Overcall",
+  "type": "Prediction market",
+  "core": false
+ },
+ {
+  "slug": "solon-borrow",
+  "name": "Solon Borrow",
+  "type": "Lending curator",
+  "core": true
+ },
+ {
+  "slug": "netnet-capital-management",
+  "name": "NetNet Capital Management",
+  "type": "Reserve token",
+  "core": false
+ }
+]
