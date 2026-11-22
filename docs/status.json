@@ -1,0 +1,32 @@
+{
+ "built": "2026-11-22T08:12:33Z",
+ "pages": {
+  "flows.html": {
+   "asof": "2026-11-21",
+   "tokens": 32,
+   "windows": [
+    "1d",
+    "7d"
+   ]
+  },
+  "holders.html": {
+   "asof": "2026-11-21",
+   "tokens": 18,
+   "not_shown": [],
+   "not_scored": [
+    "INU"
+   ]
+  },
+  "smart.html": {
+   "asof": "2026-11-21",
+   "day": "2026-11-21",
+   "wallets": 72,
+   "tokens": 32
+  },
+  "valuation.html": {
+   "asof": "2026-11-21",
+   "projects": 12
+  }
+ },
+ "failures": []
+}

@@ -1,0 +1,126 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Revenue multiple content</title>
+<!--flows-head--><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet"><!--/flows-head-->
+<style id="flows-css">
+.fl{--card:var(--panel);--card2:color-mix(in srgb,var(--panel),var(--text) 5%);--line2:color-mix(in srgb,var(--line),var(--text) 8%);
+--ink:var(--text);--faint:var(--soft2);--neg:var(--off);--warn:var(--mid);--mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+line-height:1.5;padding-top:40px}
+.fl .over{font:500 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--soft)}
+.fl h1{font-size:46px;line-height:1.05;letter-spacing:-.035em;margin:14px 0 18px;font-weight:700}
+.fl .read{font-size:18px;line-height:1.6;max-width:760px;margin:0}
+.fl .meta{font-size:13px;color:var(--faint);margin-top:14px}
+.fl .ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:34px 0 18px}
+.fl .seg{display:inline-flex;border:1px solid var(--line2);border-radius:999px;padding:3px;gap:2px;background:var(--card);max-width:100%;overflow-x:auto;scrollbar-width:none}
+.fl .seg::-webkit-scrollbar{display:none}
+.fl .seg button{all:unset;cursor:pointer;padding:6px 13px;border-radius:999px;font-size:13.5px;color:var(--soft);white-space:nowrap}
+.fl .seg button:hover{color:var(--ink)}.fl .seg button.on{background:var(--lime);color:var(--on-lime);font-weight:600}
+.fl .seg.sm button{padding:5px 11px;font-size:13px}
+.fl .count{margin-left:auto;font:12px var(--mono);color:var(--faint)}
+.fl .grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px}
+.fl .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
+.fl .card h2{font-size:19px;letter-spacing:-.02em;margin:0;font-weight:650}
+.fl .card .sub{font-size:13px;color:var(--soft);margin:6px 0 0;line-height:1.5}
+.fl .ch{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.fl .rank{margin-top:16px}
+.fl .rrow{display:grid;grid-template-columns:22px minmax(0,150px) minmax(0,1fr) 92px;gap:12px;align-items:center;padding:7px 8px;border-radius:9px;cursor:pointer}
+.fl .rrow:hover{background:var(--card2)}.fl .rrow.sel{background:var(--card2);box-shadow:inset 0 0 0 1px var(--line2)}
+.fl .rrow .n{font:12px var(--mono);color:var(--faint);text-align:right}
+.fl .tk b{font-weight:650;font-size:14px}.fl .tk small{display:block;color:var(--faint);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fl .bar{position:relative;height:16px}
+.fl .bar:before{content:"";position:absolute;left:50%;top:-4px;bottom:-4px;border-left:1px solid var(--line2)}
+.fl .bar span{position:absolute;top:2px;height:12px;border-radius:3px}
+.fl .bar .p{left:50%;background:var(--lime-ink)}.fl .bar .m{right:50%;background:var(--neg)}
+.fl .val{text-align:right;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600}
+.fl .val.p{color:var(--lime-ink)}.fl .val.m{color:var(--neg)}
+.fl .more{all:unset;cursor:pointer;margin-top:12px;border:1px solid var(--line2);border-radius:10px;padding:8px 14px;font-size:13.5px}
+.fl .more:hover{border-color:var(--soft)}
+.fl .chip{border:1px solid var(--line2);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--soft);display:inline-flex;align-items:center;gap:7px}
+.fl .pt{font:600 9.5px var(--mono);font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);border-radius:5px;padding:1px 5px;margin-left:7px;vertical-align:2px}
+.fl .flag{font-size:13px;line-height:1.5;color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);border:1px solid color-mix(in srgb,var(--warn) 25%,transparent);border-radius:10px;padding:10px 12px;margin:12px 0 0}
+.fl .lead{font:11px var(--mono);color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
+.fl table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.fl th{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:right;padding:0 0 10px;font-weight:500}
+.fl th:not(:first-child){padding-left:10px}
+.fl #stbl th{padding-left:14px;white-space:nowrap}
+.fl th:first-child,.fl td:first-child{text-align:left}
+.fl td{padding:11px 0;border-top:1px solid var(--line);text-align:right;font-size:14px}
+.fl td:not(:first-child){white-space:nowrap;padding-left:10px}
+.fl td .rg{display:block;color:var(--faint);font-size:12px;margin-top:2px;font-weight:400}
+.fl .more[hidden]{display:none}
+.fl tr.tot td{font-weight:650}
+.fl #stbl td .rg{display:inline;margin-left:6px}
+.fl tr.apart td{color:var(--soft)}
+.fl td.p{color:var(--lime-ink)}.fl td.m{color:var(--neg)}
+.fl .note{font-size:12.5px;color:var(--faint);line-height:1.55;margin:14px 0 0}
+.fl .tdet{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+.fl .tdet .hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.fl .tdet .hd b{font-size:17px}.fl .tdet .hd span{color:var(--soft);font-size:13px}
+.fl .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 6px}
+.fl .kpi{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.fl .kpi b{display:block;font-size:19px;letter-spacing:-.02em}.fl .kpi span{font-size:12px;color:var(--soft)}
+.fl .mini{display:grid;grid-template-columns:minmax(0,1fr) 120px 74px 62px 62px;gap:8px;align-items:center;font-size:13.5px;padding:8px 0;border-top:1px solid var(--line)}
+.fl .mini.h{border-top:0;font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding-top:0}
+.fl .mini>:not(:first-child){text-align:right}.fl .mini .bar{height:12px}.fl .mini .bar span{height:8px}
+.fl .sec{margin-top:48px}
+.fl .sec>.ch h2{font-size:26px;letter-spacing:-.03em;margin:0}
+.fl .sec>.ch p{color:var(--soft);margin:8px 0 0;max-width:120ch;font-size:15px}
+.fl .sread{font-size:16px;line-height:1.6;margin:16px 0 18px;max-width:900px}
+.fl details.how{margin-top:48px;border-top:1px solid var(--line);padding-top:18px}
+.fl details.how summary{cursor:pointer;font-weight:600;font-size:16px;list-style:none}
+.fl details.how summary:after{content:" +";color:var(--soft)}.fl details.how[open] summary:after{content:" \2212"}
+.fl details.how dl{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px 24px;margin:18px 0 0;font-size:14px;line-height:1.6}
+.fl details.how dt{font-weight:600}.fl details.how dd{margin:0;color:var(--soft)}
+.fl .fsrc{margin-top:28px;font-size:12.5px;color:var(--faint);line-height:1.6}
+.fl .beta{font:600 10.5px var(--mono);letter-spacing:.12em;color:var(--lime-ink);border:1px solid color-mix(in srgb,var(--lime-ink) 35%,transparent);border-radius:6px;padding:3px 7px;margin-left:10px;vertical-align:middle}
+@media (max-width:980px){.fl .grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:620px){.fl{padding-top:28px}.fl h1{font-size:34px}.fl .read{font-size:16.5px}
+.fl .rrow{grid-template-columns:18px minmax(0,96px) minmax(0,1fr) 74px;gap:8px;padding:7px 4px}.fl .val{font-size:13px}
+.fl .card{padding:18px 16px}.fl .kpis{grid-template-columns:1fr 1fr}.fl .mini{grid-template-columns:minmax(0,1fr) 70px 54px 44px 44px;font-size:12.5px}
+.fl .count{margin-left:0;width:100%}.fl #across th:nth-child(2),.fl #across td:nth-child(2){display:none}.fl td:not(:first-child){padding-left:6px}.fl details.how dl{grid-template-columns:1fr}}
+
+.fl h2.vh{font-size:46px;line-height:1.05;letter-spacing:-.035em;margin:14px 0 18px;font-weight:700}
+@media (max-width:620px){.fl h2.vh{font-size:34px}}
+.fl #vt th{padding-left:14px;white-space:nowrap}
+.fl #vt td{padding-left:14px}
+.fl #vt td:first-child{padding-left:0;white-space:normal}
+.fl #vt td .rg{display:block}
+.fl #vt td a{color:var(--ink);text-decoration:none}
+.fl #vt td a:hover b{text-decoration:underline}
+</style></head><body>
+<!--flows--><div class="fl" id="revenue-multiple">
+<div class="over">Projects · revenue multiple<span class="beta">BETA</span></div>
+<h2 class="vh">What you pay for RH revenue</h2>
+<p class="read">Pons, the biggest by fees, trades at 5.4× a year of revenue and paid holders 15% a year at today's price. SLVR and Fables trade below 1×, which usually means the revenue doesn't fully reach the token. Revenue is cooling: 11 of 12 earned less last week than their 30-day average.</p>
+<p class="meta">12 RH-native projects with a token, $50K+ of liquidity and $10K+ of revenue in 30 days. Revenue from DefiLlama through Nov 21, 2026; prices from GeckoTerminal. Not investment advice.</p>
+<div class="ctl"><div class="seg" id="s-s"></div><span class="count">12 projects</span></div>
+<div class="card" style="padding:8px 24px 4px;overflow-x:auto"><table id="vt" style="min-width:980px"></table></div>
+<details class="how"><summary>How to read it</summary><dl>
+<dt>Multiple</dt><dd>Fully diluted value divided by a year of revenue at the last 30 days' rate. 5× means the market values the project at five years of its current revenue. Lower is cheaper.</dd>
+<dt>At last week's pace</dt><dd>The same multiple using only the last 7 days of revenue. When it's higher than the multiple, revenue is slowing.</dd>
+<dt>Holder yield</dt><dd>What DefiLlama counts as holder revenue (buybacks, burns and payouts to stakers or holders) over the last 30 days, at a yearly rate, divided by fully diluted value. It's what holders got back, not a promise of what they'll get.</dd>
+<dt>Revenue</dt><dd>The part of fees the project keeps, as DefiLlama defines it for each project (open the project on DefiLlama for its method). Only revenue earned on Robinhood Chain counts.</dd>
+<dt>Flags</dt><dd>Check: below 1×, which usually means the revenue doesn't fully reach the token or the market doubts it will last; read the project's method before calling it cheap. Small float: market cap is under a quarter of fully diluted value, so most of the supply isn't trading yet. Double counted: DefiLlama also counts these fees under another project.</dd>
+<dt>Included</dt><dd>RH-native projects with a token on Robinhood Chain, $50K+ of liquidity and $10K+ of revenue in the last 30 days. Multichain apps are left out.</dd>
+</dl></details>
+<p class="fsrc">Data: DefiLlama (fees, revenue, holder revenue) and GeckoTerminal (prices, valuations, liquidity).</p>
+</div>
+<script type="application/json" id="val-data">{"rows":[{"name":"SLVR","category":"Gamified Mining","token":"0x791229e3ebd6cfdc3d8157f48722684173c29ad9","fees30":336202,"fees_prev30":825812,"fees7":55229,"rev30":279321,"rev7":45915,"hold30":279321,"double_counted":false,"slugs":["slvr"],"rh_share":1.0,"llama":"https://defillama.com/protocol/slvr","symbol":"SLVR","price":7.7886103187,"fdv":482653.235531867,"mcap":null,"liq":57531.34793737663,"vol24":16728.0163470579,"multiple":0.14202343879559606,"holder_yield":704.1091304930496,"pace":-29.551100193479396,"fees_chg":-59.28831259414975,"flags":["check"],"multiple7":0.20159780945571365},{"name":"Fables","category":"Dexs","token":"0xb63d07cef74be747231d601bb2faa6b252c68106","fees30":935723,"fees_prev30":4621408,"fees7":123720,"rev30":476355,"rev7":52476,"hold30":520351,"double_counted":false,"slugs":["fables"],"rh_share":1.0,"llama":"https://defillama.com/protocol/fables","symbol":"FABLES","price":0.01937943194,"fdv":3112367.97143259,"mcap":424729.336048187,"liq":157797.5504963675,"vol24":49257.0638070327,"multiple":0.5370176992896986,"holder_yield":203.41223225454934,"pace":-52.78791177648123,"fees_chg":-79.75242610044384,"flags":["small float","check"],"multiple7":1.137458052580234},{"name":"SHROOM","category":"Meme","token":"0xab093def657f15df31b33922a95e047add645b29","fees30":27200.93,"fees_prev30":119181.04,"fees7":2167.6,"rev30":26386.309999999998,"rev7":2053.62,"hold30":10960.26,"double_counted":false,"slugs":["shroom-token","shroom-treasury"],"rh_share":1.0,"llama":"https://defillama.com/protocol/shroom","symbol":"SHROOM","price":0.000468280108,"fdv":455953.857253947,"mcap":456019.117633151,"liq":256140.0996136053,"vol24":12654.9505950301,"multiple":1.4202690524110577,"holder_yield":29.24634321620176,"pace":-66.6447162508567,"fees_chg":-77.17679758458225,"flags":[],"multiple7":4.258003209004439},{"name":"StonkBrokers","category":"Token Locker","token":"0xe934e36a439c94017b64a3fece66af12099abf50","fees30":520688.5,"fees_prev30":346171.57999999996,"fees7":19868.63,"rev30":278281.56,"rev7":11807.12,"hold30":7853.820000000001,"double_counted":false,"slugs":["stonkbrokers-safety-deposit-box","stonkbrokers-nightshades","stonkbrokers-smart-lp","stonkbrokers-anvil","stonkbrokers-broker-box","stonkbrokers-safe-launch","stonkbrokers-desks","stonkbrokers-card-wall","stonkbrokers-mutual-fun","stonkbrokers-books","stonkbrokers-clutch-tv"],"rh_share":0.9999991734996387,"llama":"https://defillama.com/protocol/stonkbrokers","symbol":"STONKBROKER","price":0.003089795168,"fdv":7302897.99123847,"mcap":8393576.01369133,"liq":1029863.0792606928,"vol24":96992.7725817292,"multiple":2.1569456167368624,"holder_yield":1.308450564620241,"pace":-81.81627885902937,"fees_chg":50.4134163757753,"flags":[],"multiple7":11.861959386722793},{"name":"Abyss DEX","category":"Dexs","token":"0x15f3385625d7e364c5a6216fbbceadf10fa90e7d","fees30":65306,"fees_prev30":62359.76,"fees7":1795,"rev30":10885.76,"rev7":300.76000000000005,"hold30":0,"double_counted":false,"slugs":["abyss-dex"],"rh_share":1.0,"llama":"https://defillama.com/protocol/abyss-dex","symbol":"ABYSS","price":5.369385416e-06,"fdv":517587.83672504,"mcap":519083.983035649,"liq":64049.01178067396,"vol24":44071.8829021675,"multiple":3.9079922791054615,"holder_yield":null,"pace":-88.1591048436542,"fees_chg":4.724585213284982,"flags":[],"multiple7":33.00419628334502},{"name":"Pons","category":"Launchpad","token":"0x39dbed3a2bd333467115de45665cc57f813c4571","fees30":6087419,"fees_prev30":27733390,"fees7":823603,"rev30":932755,"rev7":123945,"hold30":739611,"double_counted":false,"slugs":["pons-v1","pons-v2"],"rh_share":1.0,"llama":"https://defillama.com/protocol/pons","symbol":"PONS","price":0.09101087648,"fdv":60873631.2951997,"mcap":60874998.628499,"liq":2067560.5530617258,"vol24":4332263.58728845,"multiple":5.364015375151343,"holder_yield":14.782427643197952,"pace":-43.05119166953196,"fees_chg":-78.05021672431678,"flags":[],"multiple7":9.419012499830577},{"name":"GIGA","category":"Dexs","token":"0x5baaec1b70864f01dbdb747358ff59f2e2ccf7d5","fees30":28983.92,"fees_prev30":69441.69,"fees7":4181,"rev30":25283.989999999998,"rev7":3321.44,"hold30":25283.989999999998,"double_counted":false,"slugs":["giga-v2","giga-v3"],"rh_share":1.0,"llama":"https://defillama.com/protocol/giga","symbol":"GIGA","price":0.00233673005,"fdv":2336730.05002209,"mcap":149627.61800567,"liq":57728.76097497606,"vol24":1166.35373162756,"multiple":7.596111377650627,"holder_yield":13.164630562714134,"pace":-43.70056760367783,"fees_chg":-58.26149968412347,"flags":["small float"],"multiple7":13.492340960344835},{"name":"Goo Exchange","category":"Dexs","token":"0x6572eade9fb17f4027baf92feac222b9aa746bd0","fees30":18966.07,"fees_prev30":20283.24,"fees7":3326.9300000000003,"rev30":13944.64,"rev7":2890.0,"hold30":2370.08,"double_counted":false,"slugs":["goo-exchange-clmm","goo-exchange-aggregator","goo-exchange-vaults"],"rh_share":1.0,"llama":"https://defillama.com/protocol/goo-exchange","symbol":"GOO","price":0.001499344849,"fdv":1494528.72947464,"mcap":1494568.97113659,"liq":91223.1008871193,"vol24":7250.971898971,"multiple":8.808974470838896,"holder_yield":1.929435865944833,"pace":-11.1793901763381,"fees_chg":-6.4938836201711485,"flags":[],"multiple7":9.917714467765538},{"name":"What The Hook","category":"Liquidity Automation","token":"0xb8fa8010833463aac5595b55b9045479239eff79","fees30":35002,"fees_prev30":58583,"fees7":2475,"rev30":13087,"rev7":1229,"hold30":0,"double_counted":false,"slugs":["what-the-hook"],"rh_share":1.0,"llama":"https://defillama.com/protocol/what-the-hook","symbol":"WTH","price":7.8885221187,"fdv":1630583.99947753,"mcap":1656589.64492878,"liq":323249.8887688189,"vol24":112442.438304333,"multiple":10.240742927850789,"holder_yield":null,"pace":-59.75286270999574,"fees_chg":-40.25229162043596,"flags":[],"multiple7":25.444649277935525},{"name":"The Index","category":"Indexes","token":"0x56910d4409f3a0c78c64dd8d0545ff0705389870","fees30":30673,"fees_prev30":40437,"fees7":1480,"rev30":30673,"rev7":1480,"hold30":30673,"double_counted":false,"slugs":["the-index"],"rh_share":1.0,"llama":"https://defillama.com/protocol/the-index","symbol":"Index","price":0.00409675849,"fdv":4016993.84707791,"mcap":4016993.84707791,"liq":311090.73768720136,"vol24":151796.877591336,"multiple":10.763990409872527,"holder_yield":9.290234958615525,"pace":-79.32104084094433,"fees_chg":-24.146202735118827,"flags":[],"multiple7":52.052863623741885},{"name":"Orbio","category":"AI Agents","token":"0xaa07a0e9209e16ac99708c3ec70159c6ef3128a3","fees30":59908,"fees_prev30":287244,"fees7":10393,"rev30":59908,"rev7":10393,"hold30":29510,"double_counted":false,"slugs":["orbio"],"rh_share":1.0,"llama":"https://defillama.com/protocol/orbio","symbol":"ORBIO","price":0.01031382552,"fdv":9798124.39907622,"mcap":9798134.24577013,"liq":399615.7408946229,"vol24":253970.990158915,"multiple":13.442700358462272,"holder_yield":3.664357776139114,"pace":-25.650282814601432,"fees_chg":-79.14386375346395,"flags":[],"multiple7":18.08036515450561},{"name":"Mosh","category":"Liquidity Automation","token":"0x07ebb29a38fbcb41563817e5e19f2cec619c90d2","fees30":50787.329999999994,"fees_prev30":323882,"fees7":11178.33,"rev30":41340.630000000005,"rev7":10687.47,"hold30":0,"double_counted":true,"slugs":["mosh"],"rh_share":1.0,"llama":"https://defillama.com/protocol/mosh","symbol":"BUN","price":0.01440440113,"fdv":14404284.1117776,"mcap":2975225.69894369,"liq":227082.96042594602,"vol24":71244.2407022966,"multiple":28.638019367674307,"holder_yield":null,"pace":10.795222175237406,"fees_chg":-84.31918723485714,"flags":["small float","double counted"],"multiple7":25.847702459930503}]}</script>
+<script>(()=>{
+const M=JSON.parse(document.getElementById('val-data').textContent);
+const S={sort:'multiple'};
+const fm=x=>{const a=Math.abs(x);return a>=1e9?'$'+(a/1e9).toFixed(2)+'B':a>=1e6?'$'+(a/1e6).toFixed(1)+'M':a>=1e4?'$'+Math.round(a/1e3)+'K':a>=1e3?'$'+(a/1e3).toFixed(1)+'K':'$'+Math.round(a).toLocaleString()};
+const mx=x=>x==null?'—':x<10?x.toFixed(1)+'×':Math.round(x)+'×';
+const pct=x=>x==null?'—':(x>=0?'+':'−')+Math.abs(x).toFixed(0)+'%';
+const FL={'check':'Below 1×: check how revenue reaches the token','small float':'Market cap is under a quarter of fully diluted value','double counted':'DefiLlama also counts these fees under another project'};
+function seg(el,key,opts){el.innerHTML=opts.map(([v,l])=>`<button data-v="${v}" class="${S[key]===v?'on':''}">${l}</button>`).join('');
+ el.onclick=e=>{const b=e.target.closest('button');if(!b)return;S[key]=b.dataset.v;render()}}
+function render(){
+ seg(document.getElementById('s-s'),'sort',[['multiple','Cheapest first'],['yield','Holder yield'],['rev','Biggest revenue']]);
+ const R=[...M.rows].sort((a,b)=>S.sort==='multiple'?a.multiple-b.multiple:S.sort==='yield'?(b.holder_yield||-1)-(a.holder_yield||-1):b.rev30-a.rev30);
+ document.getElementById('vt').innerHTML=`<tr><th>Project</th><th>Fully diluted</th><th>Liquidity</th><th>Revenue, 30d</th><th>Multiple</th><th>At last week's pace</th><th>Holder yield</th><th>Fees vs prior 30d</th></tr>`+
+  R.map(r=>`<tr><td><a href="${r.llama}" target="_blank" rel="noopener"><b>${r.name}</b></a>${r.flags.map(f=>`<i class="pt" title="${FL[f]||f}">${f}</i>`).join('')}<span class="rg">${r.symbol} · ${r.category}</span></td>
+  <td>${fm(r.fdv)}</td><td>${fm(r.liq)}</td><td>${fm(r.rev30)}</td><td><b>${mx(r.multiple)}</b></td><td style="color:var(--soft)">${mx(r.multiple7)}</td>
+  <td class="${r.holder_yield?'p':''}">${r.holder_yield?Math.round(r.holder_yield)+'%':'—'}</td><td class="${r.fees_chg==null?'':r.fees_chg>=0?'p':'m'}">${pct(r.fees_chg)}</td></tr>`).join('');
+}
+render();
+})();</script><!--/flows-->
+</body></html>
