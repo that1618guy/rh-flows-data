@@ -1,156 +1,378 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Holders content</title>
-<!--flows-head--><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet"><!--/flows-head-->
-<style id="flows-css">
-.fl{--card:var(--panel);--card2:color-mix(in srgb,var(--panel),var(--text) 5%);--line2:color-mix(in srgb,var(--line),var(--text) 8%);
---ink:var(--text);--faint:var(--soft2);--neg:var(--off);--warn:var(--mid);--mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
-line-height:1.5;padding-top:40px}
-.fl .over{font:500 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--soft)}
-.fl h1{font-size:46px;line-height:1.05;letter-spacing:-.035em;margin:14px 0 18px;font-weight:700}
-.fl .read{font-size:18px;line-height:1.6;max-width:760px;margin:0}
-.fl .meta{font-size:13px;color:var(--faint);margin-top:14px}
-.fl .ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:34px 0 18px}
-.fl .seg{display:inline-flex;border:1px solid var(--line2);border-radius:999px;padding:3px;gap:2px;background:var(--card);max-width:100%;overflow-x:auto;scrollbar-width:none}
-.fl .seg::-webkit-scrollbar{display:none}
-.fl .seg button{all:unset;cursor:pointer;padding:6px 13px;border-radius:999px;font-size:13.5px;color:var(--soft);white-space:nowrap}
-.fl .seg button:hover{color:var(--ink)}.fl .seg button.on{background:var(--lime);color:var(--on-lime);font-weight:600}
-.fl .seg.sm button{padding:5px 11px;font-size:13px}
-.fl .count{margin-left:auto;font:12px var(--mono);color:var(--faint)}
-.fl .grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px}
-.fl .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
-.fl .card h2{font-size:19px;letter-spacing:-.02em;margin:0;font-weight:650}
-.fl .card .sub{font-size:13px;color:var(--soft);margin:6px 0 0;line-height:1.5}
-.fl .ch{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.fl .rank{margin-top:16px}
-.fl .rrow{display:grid;grid-template-columns:22px minmax(0,150px) minmax(0,1fr) 92px;gap:12px;align-items:center;padding:7px 8px;border-radius:9px;cursor:pointer}
-.fl .rrow:hover{background:var(--card2)}.fl .rrow.sel{background:var(--card2);box-shadow:inset 0 0 0 1px var(--line2)}
-.fl .rrow .n{font:12px var(--mono);color:var(--faint);text-align:right}
-.fl .tk b{font-weight:650;font-size:14px}.fl .tk small{display:block;color:var(--faint);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fl .bar{position:relative;height:16px}
-.fl .bar:before{content:"";position:absolute;left:50%;top:-4px;bottom:-4px;border-left:1px solid var(--line2)}
-.fl .bar span{position:absolute;top:2px;height:12px;border-radius:3px}
-.fl .bar .p{left:50%;background:var(--lime-ink)}.fl .bar .m{right:50%;background:var(--neg)}
-.fl .val{text-align:right;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600}
-.fl .val.p{color:var(--lime-ink)}.fl .val.m{color:var(--neg)}
-.fl .more{all:unset;cursor:pointer;margin-top:12px;border:1px solid var(--line2);border-radius:10px;padding:8px 14px;font-size:13.5px}
-.fl .more:hover{border-color:var(--soft)}
-.fl .chip{border:1px solid var(--line2);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--soft);display:inline-flex;align-items:center;gap:7px}
-.fl .pt{font:600 9.5px var(--mono);font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);border-radius:5px;padding:1px 5px;margin-left:7px;vertical-align:2px}
-.fl .flag{font-size:13px;line-height:1.5;color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);border:1px solid color-mix(in srgb,var(--warn) 25%,transparent);border-radius:10px;padding:10px 12px;margin:12px 0 0}
-.fl .lead{font:11px var(--mono);color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
-.fl table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-.fl th{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:right;padding:0 0 10px;font-weight:500}
-.fl th:not(:first-child){padding-left:10px}
-.fl #stbl th{padding-left:14px;white-space:nowrap}
-.fl th:first-child,.fl td:first-child{text-align:left}
-.fl td{padding:11px 0;border-top:1px solid var(--line);text-align:right;font-size:14px}
-.fl td:not(:first-child){white-space:nowrap;padding-left:10px}
-.fl td .rg{display:block;color:var(--faint);font-size:12px;margin-top:2px;font-weight:400}
-.fl .more[hidden]{display:none}
-.fl tr.tot td{font-weight:650}
-.fl #stbl td .rg{display:inline;margin-left:6px}
-.fl tr.apart td{color:var(--soft)}
-.fl td.p{color:var(--lime-ink)}.fl td.m{color:var(--neg)}
-.fl .note{font-size:12.5px;color:var(--faint);line-height:1.55;margin:14px 0 0}
-.fl .tdet{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
-.fl .tdet .hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.fl .tdet .hd b{font-size:17px}.fl .tdet .hd span{color:var(--soft);font-size:13px}
-.fl .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 6px}
-.fl .kpi{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.fl .kpi b{display:block;font-size:19px;letter-spacing:-.02em}.fl .kpi span{font-size:12px;color:var(--soft)}
-.fl .mini{display:grid;grid-template-columns:minmax(0,1fr) 120px 74px 62px 62px;gap:8px;align-items:center;font-size:13.5px;padding:8px 0;border-top:1px solid var(--line)}
-.fl .mini.h{border-top:0;font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding-top:0}
-.fl .mini>:not(:first-child){text-align:right}.fl .mini .bar{height:12px}.fl .mini .bar span{height:8px}
-.fl .sec{margin-top:48px}
-.fl .sec>.ch h2{font-size:26px;letter-spacing:-.03em;margin:0}
-.fl .sec>.ch p{color:var(--soft);margin:8px 0 0;max-width:120ch;font-size:15px}
-.fl .sread{font-size:16px;line-height:1.6;margin:16px 0 18px;max-width:900px}
-.fl details.how{margin-top:48px;border-top:1px solid var(--line);padding-top:18px}
-.fl details.how summary{cursor:pointer;font-weight:600;font-size:16px;list-style:none}
-.fl details.how summary:after{content:" +";color:var(--soft)}.fl details.how[open] summary:after{content:" \2212"}
-.fl details.how dl{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px 24px;margin:18px 0 0;font-size:14px;line-height:1.6}
-.fl details.how dt{font-weight:600}.fl details.how dd{margin:0;color:var(--soft)}
-.fl .fsrc{margin-top:28px;font-size:12.5px;color:var(--faint);line-height:1.6}
-.fl .beta{font:600 10.5px var(--mono);letter-spacing:.12em;color:var(--lime-ink);border:1px solid color-mix(in srgb,var(--lime-ink) 35%,transparent);border-radius:6px;padding:3px 7px;margin-left:10px;vertical-align:middle}
-@media (max-width:980px){.fl .grid{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:620px){.fl{padding-top:28px}.fl h1{font-size:34px}.fl .read{font-size:16.5px}
-.fl .rrow{grid-template-columns:18px minmax(0,96px) minmax(0,1fr) 74px;gap:8px;padding:7px 4px}.fl .val{font-size:13px}
-.fl .card{padding:18px 16px}.fl .kpis{grid-template-columns:1fr 1fr}.fl .mini{grid-template-columns:minmax(0,1fr) 70px 54px 44px 44px;font-size:12.5px}
-.fl .count{margin-left:0;width:100%}.fl #across th:nth-child(2),.fl #across td:nth-child(2){display:none}.fl td:not(:first-child){padding-left:6px}.fl details.how dl{grid-template-columns:1fr}}
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Holders · State of Robinhood Chain</title><meta name="description" content="How firmly each Robinhood Chain token is held, and where its holders stand.">
+<!--sob-fonts--><style>
+/* The site's own tokens and type (Inter, Inter Tight for headings and figures, mono caps for kickers), unchanged.
+   layout: one 1320px column, 68px header; hairlines and space do the grouping. */
+:root{--bg:#171715;--panel:#1d1d1b;--text:#ecebe6;--soft:#a3a29b;--soft2:#6f6e68;--line:#2f2f2c;--on:#8fcf9f;--mid:#e2b56f;--off:#ef8f84;
+  --lime:#ccff00;--lime-ink:#ccff00;--lime-soft:rgba(204,255,0,.07);--on-lime:#151514;
+  --raised:#262624;--hover:#222220;--line-2:#3e3e3a;
+  --surface:var(--panel);--ink:var(--text);--ink-2:var(--soft);--ink-3:var(--soft2);
+  --up:var(--lime-ink);--down:var(--off);--up-ink:var(--lime-ink);--down-ink:var(--off);
+  --font:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--tight:"Inter Tight",Inter,system-ui,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--r:12px;color-scheme:dark}
+:root.light{--bg:#f8f8f6;--panel:#f0efeb;--text:#1b1a17;--soft:#605d57;--soft2:#a29f97;--line:#e5e3dd;--on:#2b7a43;--mid:#8e600c;--off:#b23f2e;
+  --lime:#c6f500;--lime-ink:#4a7a00;--lime-soft:rgba(170,220,0,.16);--raised:#e6e5e0;--hover:#eae9e4;--line-2:#d2cfc7;
+  --up:#467a00;--down:#f08573;--up-ink:#3f7000;--down-ink:#b23f2e;color-scheme:light}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 var(--font);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit}
+h1,h2,h3,h4,p,ol,ul,dl,dd{margin:0}
+:focus-visible{outline:2px solid var(--lime-ink);outline-offset:2px;border-radius:6px}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(40px,env(safe-area-inset-left,0px));padding-right:max(40px,env(safe-area-inset-right,0px))}
 
-.fl .hrow{display:grid;grid-template-columns:22px minmax(0,150px) 44px minmax(0,1fr) 46px;gap:12px;align-items:center;padding:8px;border-radius:9px;cursor:pointer}
-.fl .hrow:hover{background:var(--card2)}
-.fl .hrow.sel{background:var(--card2);box-shadow:inset 0 0 0 1px var(--line2)}
-.fl .hrow .n{font:12px var(--mono);color:var(--faint);text-align:right}
-.fl .sc{font-size:18px;font-weight:650;text-align:right;letter-spacing:-.02em}
-.fl .meter{height:8px;background:var(--card2);border-radius:4px;overflow:hidden}
-.fl .meter span{display:block;height:100%;background:var(--lime-ink);border-radius:4px}
-.fl #det .hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.fl #det .hd b{font-size:19px}
-.fl #det .hd span{color:var(--soft);font-size:13px}
-.fl .big{display:flex;align-items:baseline;gap:12px;margin:14px 0 4px;flex-wrap:wrap}
-.fl .big b{font-size:52px;letter-spacing:-.04em;line-height:1}
-.fl .big span{color:var(--soft);font-size:13px}
-.fl .moved{font-size:14.5px;line-height:1.55;margin:10px 0 16px}
-.fl .part{border-top:1px solid var(--line);padding:12px 0}
-.fl .ph{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:14px;font-weight:600}
-.fl .ph i{font:500 11px var(--mono);color:var(--faint);font-style:normal;margin-left:6px}
-.fl .part p{margin:8px 0 0;font-size:13px;color:var(--ink);line-height:1.5}
-.fl .part p span{color:var(--faint)}
-@media (max-width:620px){.fl .hrow{grid-template-columns:18px minmax(0,90px) 34px minmax(0,1fr) 36px;gap:8px;padding:8px 4px}}
-</style></head><body>
-<!--flows--><div class="fl">
-<div class="over">Holder strength<span class="beta">BETA</span></div>
-<h1>Are RH holders holding?</h1>
-<p class="read">HMM has the strongest holders of the 18 RH tokens we score (61 out of 100), RAETO the weakest (28). Scores fell for 8 of 18 this week; UBIK moved most (−14) as its 50 largest holders cut 10.9%. MOW scores 86 but trades mostly as pass-through volume, so it's flagged.</p>
-<p class="meta">Through Nov 22, 2026 UTC, from every transfer since each token's first pool. Not investment advice.</p>
-<div class="ctl"><div class="seg" id="s-c"></div><div class="seg" id="s-s"></div><span class="count" id="count"></span></div>
-<div class="grid">
- <section class="card"><div class="ch"><div><h2>Holder strength, 0 to 100</h2><p class="sub">Change is against a week ago. Click a token for its four parts.</p></div></div>
-  <div class="rank" id="hl"></div></section>
- <section class="card" id="det"></section>
-</div>
-<details class="how"><summary>How to read it</summary><dl>
-<dt>Holders</dt><dd>Wallets holding the token, including smart wallets (EIP-7702 and small wallet proxies). Pools, the Uniswap v4 pool manager, other contracts and burn addresses are left out.</dd>
-<dt>Conviction, 35%</dt><dd>The share of holder supply held for 30+ days by wallets that moved none of it out in that time. 0% scores 0, 80% or more scores 100.</dd>
-<dt>Top holders, 25%</dt><dd>How the 50 largest holders of a week ago changed their combined balance since. Cutting 10% or more scores 0, flat scores 50, adding 10% or more scores 100.</dd>
-<dt>Breadth, 20%</dt><dd>The number of holders worth $10+ against a week ago (at today's price, so price moves don't change the count), averaged with the share of wallets that became holders 8 to 14 days ago and still hold. Shrinking 10% scores 0, growing 10% scores 100; keeping 80% of new holders scores 100.</dd>
-<dt>In profit, 20%</dt><dd>The share of holder supply whose last top-up was at or below today's price: holders sitting on gains have less reason to sell into a bounce. The score is that share.</dd>
-<dt>Fixed scales</dt><dd>Every part uses the same scale for every token and every day, so a 60 means the same thing on PONS as on a meme, and today's score can be compared with last month's.</dd>
-<dt>Tokens</dt><dd>Memes, AI and agent tokens, and ecosystem tokens from Flows. Stock tokens are left out: their holders follow the stock, not the project. Not scored: INU (not enough daily prices).</dd>
-</dl></details>
-<p class="fsrc">Data: Robinhood Chain (every transfer since each token's first pool) and GeckoTerminal (prices), through Nov 22, 2026 UTC.</p>
-</div>
-<script type="application/json" id="h-data">{"asof":"2026-11-22","tokens":[{"symbol":"AI","token":"0x2e8c31162b855a2ffa90f6f8634643ad6f111e18","category":"memes","price":0.0178465839573951,"price_chg_7d":-34.8,"asof":"2026-11-22","now":{"score":45.9,"parts":{"conviction":62.5,"top":30.4,"breadth":63.2,"profit":19.1},"facts":{"conviction":50.0,"top_chg":-3.9,"holders":7885,"holders_chg":-1.5,"kept":67.2,"new":656,"in_profit":19.1,"top10":17.7}},"week_ago":{"score":55.5,"parts":{"conviction":61.8,"top":70.6,"breadth":58.7,"profit":22.3},"facts":{"conviction":49.5,"top_chg":4.1,"holders":9240,"holders_chg":-0.7,"kept":56.6,"new":908,"in_profit":22.3,"top10":17.6}},"transfers":10646796,"name":"Artificial Inu","moved":"The 50 largest holders cut 3.9% this week, after adding 4.1% the week before.","flags":[]},{"symbol":"BONER","token":"0x98096d17e191b3da1d5f99a6d7b3584351b11e18","category":"memes","price":0.0021684106188745696,"price_chg_7d":-32.1,"asof":"2026-11-22","now":{"score":50.1,"parts":{"conviction":72.2,"top":35.0,"breadth":59.7,"profit":20.9},"facts":{"conviction":57.7,"top_chg":-3.0,"holders":2308,"holders_chg":-2.7,"kept":66.1,"new":127,"in_profit":20.9,"top10":22.7}},"week_ago":{"score":39.8,"parts":{"conviction":70.3,"top":7.2,"breadth":48.8,"profit":18.3},"facts":{"conviction":56.2,"top_chg":-8.6,"holders":2687,"holders_chg":-3.8,"kept":53.4,"new":380,"in_profit":18.3,"top10":22.2}},"transfers":2471114,"name":"Boner Coin","moved":"The 50 largest holders cut 3.0% this week, less than the 8.6% the week before.","flags":[]},{"symbol":"BUN","token":"0x07ebb29a38fbcb41563817e5e19f2cec619c90d2","category":"agents","price":0.0161250985799912,"price_chg_7d":-12.6,"asof":"2026-11-22","now":{"score":46.1,"parts":{"conviction":13.7,"top":50.0,"breadth":60.4,"profit":83.8},"facts":{"conviction":11.0,"top_chg":-0.0,"holders":1512,"holders_chg":-2.2,"kept":65.5,"new":55,"in_profit":83.8,"top10":82.9}},"week_ago":{"score":45.4,"parts":{"conviction":14.0,"top":48.7,"breadth":57.8,"profit":83.9},"facts":{"conviction":11.2,"top_chg":-0.3,"holders":1579,"holders_chg":-4.6,"kept":71.1,"new":90,"in_profit":83.9,"top10":82.9}},"transfers":471445,"name":"Bundle Cat","moved":"Little changed this week.","flags":[]},{"symbol":"CASHCAT","token":"0x020bfc650a365f8bb26819deaabf3e21291018b4","category":"memes","price":0.044319372973504995,"price_chg_7d":6.3,"asof":"2026-11-22","now":{"score":48.8,"parts":{"conviction":46.5,"top":44.6,"breadth":67.8,"profit":39.0},"facts":{"conviction":37.2,"top_chg":-1.1,"holders":12120,"holders_chg":0.0,"kept":68.4,"new":664,"in_profit":39.0,"top10":41.3}},"week_ago":{"score":48.1,"parts":{"conviction":47.6,"top":49.0,"breadth":64.0,"profit":31.7},"facts":{"conviction":38.1,"top_chg":-0.2,"holders":11855,"holders_chg":-0.8,"kept":65.7,"new":677,"in_profit":31.7,"top10":40.3}},"transfers":14153018,"name":"Cash Cat","moved":"39% of holder supply is in profit, up from 32% a week ago.","flags":[]},{"symbol":"HMM","token":"0x7fe995a80075df3dc8ae11a9b82c7fe4202cd87f","category":"memes","price":0.006734620328935169,"price_chg_7d":-3.4,"asof":"2026-11-22","now":{"score":61.1,"parts":{"conviction":86.1,"top":51.1,"breadth":48.3,"profit":42.8},"facts":{"conviction":68.9,"top_chg":0.2,"holders":3815,"holders_chg":-1.6,"kept":43.6,"new":195,"in_profit":42.8,"top10":22.2}},"week_ago":{"score":63.1,"parts":{"conviction":84.6,"top":53.9,"breadth":53.5,"profit":46.6},"facts":{"conviction":67.7,"top_chg":0.8,"holders":3893,"holders_chg":-0.7,"kept":48.3,"new":344,"in_profit":46.6,"top10":22.2}},"transfers":1551057,"name":"Thinking Cat","moved":"Holders worth $10+ shrank 1.6% to 3,815, and 44% of last week's new holders are still in.","flags":[]},{"symbol":"MEME","token":"0x385f4f8ae47651ce5f58f5265395a669f8281e18","category":"memes","price":0.00229140979613409,"price_chg_7d":-24.5,"asof":"2026-11-22","now":{"score":41.7,"parts":{"conviction":75.8,"top":0.0,"breadth":59.7,"profit":16.3},"facts":{"conviction":60.6,"top_chg":-13.2,"holders":3016,"holders_chg":-1.3,"kept":60.8,"new":97,"in_profit":16.3,"top10":22.9}},"week_ago":{"score":45.7,"parts":{"conviction":79.8,"top":19.7,"breadth":47.2,"profit":17.0},"facts":{"conviction":63.9,"top_chg":-6.1,"holders":3448,"holders_chg":-5.2,"kept":56.5,"new":184,"in_profit":17.0,"top10":20.4}},"transfers":3783126,"name":"A Meme Coin","moved":"The 50 largest holders cut 13.2% this week, more than the 6.1% the week before.","flags":[]},{"symbol":"MONITOR","token":"0x1a911bb954daa9cb38513423075be74450351e18","category":"memes","price":0.000335466775806137,"price_chg_7d":-22.9,"asof":"2026-11-22","now":{"score":49.8,"parts":{"conviction":82.8,"top":29.3,"breadth":52.8,"profit":14.8},"facts":{"conviction":66.3,"top_chg":-4.1,"holders":382,"holders_chg":-2.1,"kept":52.6,"new":19,"in_profit":14.8,"top10":25.8}},"week_ago":{"score":51.8,"parts":{"conviction":79.9,"top":55.8,"breadth":29.6,"profit":20.0},"facts":{"conviction":63.9,"top_chg":1.2,"holders":407,"holders_chg":-8.3,"kept":40.6,"new":32,"in_profit":20.0,"top10":26.5}},"transfers":366802,"name":"The Situation","moved":"The 50 largest holders cut 4.1% this week, after adding 1.2% the week before.","flags":[]},{"symbol":"MOO","token":"0xd9db30bb0d2b8d2eae3826a1372117e058791e18","category":"memes","price":0.000481291190676235,"price_chg_7d":-35.5,"asof":"2026-11-22","now":{"score":44.7,"parts":{"conviction":80.3,"top":13.1,"breadth":55.6,"profit":11.2},"facts":{"conviction":64.2,"top_chg":-7.4,"holders":1256,"holders_chg":-3.5,"kept":63.2,"new":57,"in_profit":11.2,"top10":21.4}},"week_ago":{"score":50.9,"parts":{"conviction":76.2,"top":38.3,"breadth":50.6,"profit":22.6},"facts":{"conviction":61.0,"top_chg":-2.3,"holders":1491,"holders_chg":-3.1,"kept":53.2,"new":62,"in_profit":22.6,"top10":21.3}},"transfers":1026290,"name":"Memory cow Moo","moved":"The 50 largest holders cut 7.4% this week, more than the 2.3% the week before.","flags":[]},{"symbol":"MOW","token":"0x0b7c6c138dc75622f4200d157b13fb93e6bd94fa","category":"memes","price":0.186804568197041,"price_chg_7d":20.7,"asof":"2026-11-22","now":{"score":85.6,"parts":{"conviction":100.0,"top":42.4,"breadth":100.0,"profit":99.9},"facts":{"conviction":97.1,"top_chg":-1.5,"holders":13046,"holders_chg":19.4,"kept":99.9,"new":6564,"in_profit":99.9,"top10":3.5}},"week_ago":{"score":53.5,"parts":{"conviction":100.0,"top":31.6,"breadth":50.0,"profit":2.9},"facts":{"conviction":97.1,"top_chg":-3.7,"holders":10685,"holders_chg":954.8,"kept":0.0,"new":2,"in_profit":2.9,"top10":3.6}},"transfers":65639,"name":"MowCat","moved":"100% of holder supply is in profit, up from 3% a week ago.","flags":["pass-through"]},{"symbol":"ORBIO","token":"0xaa07a0e9209e16ac99708c3ec70159c6ef3128a3","category":"agents","price":0.011362292337969999,"price_chg_7d":-46.5,"asof":"2026-11-22","now":{"score":47.6,"parts":{"conviction":69.3,"top":14.1,"breadth":66.0,"profit":33.1},"facts":{"conviction":55.4,"top_chg":-7.2,"holders":3087,"holders_chg":0.6,"kept":63.2,"new":307,"in_profit":33.1,"top10":26.6}},"week_ago":{"score":49.5,"parts":{"conviction":65.6,"top":35.5,"breadth":66.0,"profit":22.3},"facts":{"conviction":52.5,"top_chg":-2.9,"holders":3524,"holders_chg":0.8,"kept":62.4,"new":420,"in_profit":22.3,"top10":26.9}},"transfers":2405458,"name":"Orbio.so","moved":"The 50 largest holders cut 7.2% this week, more than the 2.9% the week before.","flags":[]},{"symbol":"PONS","token":"0x39dbed3a2bd333467115de45665cc57f813c4571","category":"ecosystem","price":0.09394677463160458,"price_chg_7d":-23.4,"asof":"2026-11-22","now":{"score":45.6,"parts":{"conviction":40.9,"top":40.4,"breadth":68.2,"profit":37.6},"facts":{"conviction":32.7,"top_chg":-1.9,"holders":18590,"holders_chg":-1.0,"kept":72.9,"new":757,"in_profit":37.6,"top10":37.0}},"week_ago":{"score":45.9,"parts":{"conviction":44.0,"top":52.7,"breadth":63.3,"profit":23.3},"facts":{"conviction":35.2,"top_chg":0.5,"holders":20131,"holders_chg":-1.8,"kept":68.4,"new":1100,"in_profit":23.3,"top10":38.1}},"transfers":16119732,"name":"Pons","moved":"The 50 largest holders cut 1.9% this week, after adding 0.5% the week before.","flags":[]},{"symbol":"PRIORS","token":"0xedbf91223639800bcd5756815caf908df3b890be","category":"agents","price":0.00322969075030058,"price_chg_7d":-34.9,"asof":"2026-11-22","now":{"score":32.8,"parts":{"conviction":38.3,"top":0.0,"breadth":63.0,"profit":34.1},"facts":{"conviction":30.6,"top_chg":-12.1,"holders":2043,"holders_chg":-1.1,"kept":65.1,"new":255,"in_profit":34.1,"top10":19.0}},"week_ago":{"score":32.1,"parts":{"conviction":34.8,"top":0.0,"breadth":64.2,"profit":35.2},"facts":{"conviction":27.8,"top_chg":-10.8,"holders":2225,"holders_chg":0.0,"kept":62.8,"new":290,"in_profit":35.2,"top10":18.4}},"transfers":507010,"name":"Priors Agents","moved":"Conviction rose: 31% of holder supply has sat untouched for 30+ days, from 28% a week ago.","flags":[]},{"symbol":"RAETO","token":"0x72be1277e198d0c476869253cb4e62807e14533c","category":"agents","price":0.0008578073139402149,"price_chg_7d":-55.5,"asof":"2026-11-22","now":{"score":28.2,"parts":{"conviction":21.1,"top":4.3,"breadth":66.0,"profit":32.9},"facts":{"conviction":16.9,"top_chg":-9.1,"holders":725,"holders_chg":0.0,"kept":65.5,"new":119,"in_profit":32.9,"top10":27.4}},"week_ago":{"score":25.6,"parts":{"conviction":3.1,"top":0.0,"breadth":53.0,"profit":69.4},"facts":{"conviction":2.5,"top_chg":-11.9,"holders":811,"holders_chg":-4.0,"kept":61.0,"new":269,"in_profit":69.4,"top10":26.2}},"transfers":166662,"name":"Raeto","moved":"Conviction rose: 17% of holder supply has sat untouched for 30+ days, from 2% a week ago.","flags":[]},{"symbol":"SCHIFFY","token":"0x42afa2124ca5a2b83898e46b2da9a190995b1e18","category":"memes","price":0.00118887681545653,"price_chg_7d":-24.1,"asof":"2026-11-22","now":{"score":38.6,"parts":{"conviction":45.7,"top":29.0,"breadth":66.4,"profit":10.2},"facts":{"conviction":36.6,"top_chg":-4.2,"holders":1062,"holders_chg":-3.5,"kept":80.3,"new":66,"in_profit":10.2,"top10":20.1}},"week_ago":{"score":40.2,"parts":{"conviction":43.0,"top":42.1,"breadth":61.8,"profit":11.2},"facts":{"conviction":34.4,"top_chg":-1.6,"holders":1155,"holders_chg":-3.9,"kept":74.6,"new":177,"in_profit":11.2,"top10":19.4}},"transfers":736963,"name":"SCHIFFY","moved":"The 50 largest holders cut 4.2% this week, more than the 1.6% the week before.","flags":[]},{"symbol":"STANDARD","token":"0x88ad8ddf1e3898412146a534538d418c6f8a9062","category":"ecosystem","price":0.10574927259841399,"price_chg_7d":-11.5,"asof":"2026-11-22","now":{"score":45.2,"parts":{"conviction":83.0,"top":10.6,"breadth":65.9,"profit":1.6},"facts":{"conviction":66.4,"top_chg":-7.9,"holders":1314,"holders_chg":-3.1,"kept":77.8,"new":54,"in_profit":1.6,"top10":39.9}},"week_ago":{"score":36.5,"parts":{"conviction":75.8,"top":0.0,"breadth":45.9,"profit":3.8},"facts":{"conviction":60.6,"top_chg":-32.7,"holders":1399,"holders_chg":-7.1,"kept":61.9,"new":97,"in_profit":3.8,"top10":36.9}},"transfers":350701,"name":"The Standard Reserve","moved":"Holders worth $10+ shrank 3.1% to 1,314, and 78% of last week's new holders are still in.","flags":[]},{"symbol":"TENDIES","token":"0x45242320dbb855eea8fd36804c6487e10e97fcf9","category":"memes","price":0.0022630893381265296,"price_chg_7d":-29.2,"asof":"2026-11-22","now":{"score":55.3,"parts":{"conviction":88.7,"top":29.7,"breadth":63.6,"profit":20.4},"facts":{"conviction":71.0,"top_chg":-4.1,"holders":2072,"holders_chg":-1.6,"kept":68.2,"new":88,"in_profit":20.4,"top10":18.2}},"week_ago":{"score":54.0,"parts":{"conviction":92.4,"top":27.4,"breadth":59.4,"profit":14.5},"facts":{"conviction":73.9,"top_chg":-4.5,"holders":2283,"holders_chg":-0.4,"kept":56.8,"new":111,"in_profit":14.5,"top10":17.3}},"transfers":1902954,"name":"TENDIES","moved":"20% of holder supply is in profit, up from 14% a week ago.","flags":[]},{"symbol":"UBIK","token":"0x812486eaea648819853f8e372dc9f1516c7868bd","category":"memes","price":0.0022570136892920097,"price_chg_7d":-40.7,"asof":"2026-11-22","now":{"score":41.5,"parts":{"conviction":79.8,"top":0.0,"breadth":56.3,"profit":11.4},"facts":{"conviction":63.9,"top_chg":-10.9,"holders":1659,"holders_chg":-3.8,"kept":65.2,"new":66,"in_profit":11.4,"top10":28.0}},"week_ago":{"score":55.3,"parts":{"conviction":81.2,"top":48.8,"breadth":53.3,"profit":20.0},"facts":{"conviction":64.9,"top_chg":-0.2,"holders":1943,"holders_chg":-4.7,"kept":64.1,"new":103,"in_profit":20.0,"top10":25.3}},"transfers":850458,"name":"ubik","moved":"The 50 largest holders cut 10.9% this week, more than the 0.2% the week before.","flags":[]},{"symbol":"WALLET","token":"0x0339f5459fc690ac85f1782e15782a151b4a9e1b","category":"memes","price":0.00950500348268352,"price_chg_7d":-11.8,"asof":"2026-11-22","now":{"score":59.5,"parts":{"conviction":78.5,"top":45.5,"breadth":72.2,"profit":31.0},"facts":{"conviction":62.8,"top_chg":-0.9,"holders":3408,"holders_chg":-0.9,"kept":78.9,"new":114,"in_profit":31.0,"top10":16.5}},"week_ago":{"score":59.5,"parts":{"conviction":74.3,"top":57.3,"breadth":61.3,"profit":34.4},"facts":{"conviction":59.5,"top_chg":1.5,"holders":3522,"holders_chg":-0.9,"kept":61.9,"new":97,"in_profit":34.4,"top10":16.5}},"transfers":807020,"name":"Wallet","moved":"The 50 largest holders cut 0.9% this week, after adding 1.5% the week before.","flags":[]}],"stale":[],"unbuildable":[],"unpriced":["INU"],"cats":[{"id":"memes","label":"Memes"},{"id":"stocks","label":"Stock tokens"},{"id":"agents","label":"AI & agents"},{"id":"ecosystem","label":"Ecosystem"}],"labels":{"conviction":"Conviction","top":"Top holders","breadth":"Breadth","profit":"In profit"},"weights":{"conviction":0.35,"top":0.25,"breadth":0.2,"profit":0.2}}</script>
-<script>
-const M=JSON.parse(document.getElementById('h-data').textContent);
-const S={c:'all',sort:'score',sel:null};
-const K=['conviction','top','breadth','profit'];
-const pct=x=>x==null?'—':(x>=0?'+':'−')+Math.abs(x).toFixed(1)+'%';
-function seg(el,key,opts){el.innerHTML=opts.map(([v,l])=>`<button data-v="${v}" class="${S[key]===v?'on':''}">${l}</button>`).join('');
- el.onclick=e=>{const b=e.target.closest('button');if(!b)return;S[key]=b.dataset.v;if(key==='c')S.sel=null;render()}}
-function meter(v){return `<div class="meter"><span style="width:${Math.max(1,v).toFixed(1)}%"></span></div>`}
-function render(){
- seg(document.getElementById('s-c'),'c',[['all','All'],...M.cats.filter(c=>M.tokens.some(t=>t.category===c.id)).map(c=>[c.id,c.label])]);
- seg(document.getElementById('s-s'),'sort',[['score','Strongest first'],['chg','Biggest change']]);
- const T=M.tokens.filter(t=>S.c==='all'||t.category===S.c).sort((a,b)=>S.sort==='score'?b.now.score-a.now.score:Math.abs(b.now.score-b.week_ago.score)-Math.abs(a.now.score-a.week_ago.score));
- if(!S.sel||!T.includes(S.sel))S.sel=T.find(t=>!t.flags.length)||T[0];
- document.getElementById('count').textContent=T.length+' tokens';
- document.getElementById('hl').innerHTML=T.map((t,i)=>{const d=t.now.score-t.week_ago.score;
-  return `<div class="hrow ${t===S.sel?'sel':''}" data-s="${t.symbol}"><span class="n">${i+1}</span><span class="tk"><b>${t.symbol}</b>${t.flags.includes('pass-through')?'<i class="pt" title="Most of its volume is pass-through: see Flows">pass-through</i>':''}<small>${t.name}</small></span>
-  <span class="sc">${Math.round(t.now.score)}</span>${meter(t.now.score)}<span class="val ${Math.abs(d)<0.5?'':d>0?'p':'m'}">${Math.abs(d)<0.5?'±0':(d>0?'+':'−')+Math.abs(d).toFixed(0)}</span></div>`}).join('');
- document.getElementById('hl').onclick=e=>{const r=e.target.closest('.hrow');if(!r)return;S.sel=M.tokens.find(t=>t.symbol===r.dataset.s);render()};
- const t=S.sel;if(!t)return;const f=t.now.facts,g=t.week_ago.facts;
- const rows=[['conviction',`${f.conviction.toFixed(0)}% of holder supply untouched for 30+ days`,`${g.conviction.toFixed(0)}% a week ago`],
-  ['top',`50 largest holders ${f.top_chg>=0?'added':'cut'} ${Math.abs(f.top_chg).toFixed(1)}% this week`,`${g.top_chg>=0?'added':'cut'} ${Math.abs(g.top_chg).toFixed(1)}% the week before`],
-  ['breadth',`${f.holders.toLocaleString()} holders worth $10+ (${pct(f.holders_chg)} on the week)`+(f.kept!=null?`; ${f.kept.toFixed(0)}% of ${f.new} new holders still in`:''),`${g.holders.toLocaleString()} a week ago`],
-  ['profit',`${f.in_profit.toFixed(0)}% of holder supply in profit`,`${g.in_profit.toFixed(0)}% a week ago`]];
- document.getElementById('det').innerHTML=`<div class="hd"><b>${t.symbol}</b><span>${t.name}</span><a class="chip" style="margin-left:auto" href="https://www.geckoterminal.com/robinhood/tokens/${t.token}" target="_blank" rel="noopener">Chart ↗</a></div>
-  <div class="big"><b>${Math.round(t.now.score)}</b><span>out of 100 · ${Math.round(t.week_ago.score)} a week ago · price ${pct(t.price_chg_7d)} on the week</span></div>
-  <p class="moved">${t.moved}</p>`+
-  rows.map(([k,a,b])=>`<div class="part"><div class="ph"><span>${M.labels[k]} <i>${Math.round(M.weights[k]*100)}%</i></span><b>${Math.round(t.now.parts[k])}</b></div>${meter(t.now.parts[k])}<p>${a} <span>· ${b}</span></p></div>`).join('')+
-  (t.flags.includes('pass-through')?`<p class="flag">Most of this token's trading volume comes from wallets that held none before and none after (Flows' pass-through share). Its price, and so its in-profit share, may be propped up by wash trading.</p>`:'')+
-  `<p class="note">Top 10 holders own ${f.top10.toFixed(0)}% of holder supply. ${t.transfers.toLocaleString()} transfers read, every one since the token's first pool.</p>`;
+/* header */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:var(--bg)}
+.hd{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.hd .wrap{display:flex;align-items:center;gap:36px;height:68px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;font:600 16px var(--tight);letter-spacing:-.01em;white-space:nowrap}
+.mark{width:32px;height:32px;border-radius:7px;background:var(--text);color:var(--bg);display:grid;place-items:center;flex:none}
+.mark svg{width:28px;height:28px}
+.brand u{align-self:stretch;width:1px;margin:5px 2px;background:var(--line-2);text-decoration:none}
+.brand .rh{color:var(--soft)}
+.nav{display:flex;align-items:center;gap:6px}
+.nav a,.nav button{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px;border:0;border-radius:8px;background:none;color:var(--soft);text-decoration:none;font-size:14px;cursor:pointer}
+.nav a:hover,.nav button:hover{color:var(--text)}
+.nav .on{color:var(--text)}
+.nav button svg{transition:transform .18s ease}
+.nav button[aria-expanded="true"]{color:var(--text);background:var(--raised)}
+.nav button[aria-expanded="true"] svg{transform:rotate(180deg)}
+.hd-r{margin-left:auto;display:flex;align-items:center;gap:14px}
+.stamp{color:var(--soft);font-size:13px;white-space:nowrap}
+.theme{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--text);display:grid;place-items:center;cursor:pointer}
+.theme svg{width:16px;height:16px}
+.menu{position:absolute;left:0;right:0;top:100%;pointer-events:none}
+.menu .wrap{position:relative}
+.sheet{position:absolute;top:8px;left:calc(max(40px,env(safe-area-inset-left,0px)) + 250px);width:min(600px,calc(100vw - 40px));display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;padding:18px;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;box-shadow:0 24px 60px -18px rgba(0,0,0,.55);pointer-events:auto;transform-origin:top left;animation:pop .16s ease}
+@keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.sheet h4{margin:4px 10px 6px;font:500 11px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--soft2)}
+.sheet a{display:block;padding:9px 10px;border-radius:9px;text-decoration:none}
+.sheet a:hover,.sheet a.on{background:var(--raised)}
+.sheet a b{display:block;font:600 16px var(--tight);letter-spacing:-.01em}
+.sheet a span{display:block;color:var(--soft);font-size:13px;line-height:1.35;margin-top:1px}
+
+/* page furniture */
+main{padding-block:32px 40px}
+.eyebrow,.kicker{font:500 12px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--soft);margin:0 0 16px}
+h1{font:600 60px/1.02 var(--tight);letter-spacing:-.035em;text-wrap:balance}
+h2{font:600 26px var(--tight);letter-spacing:-.02em}
+.lede{margin-top:16px;max-width:56ch;color:var(--soft);font-size:18px;line-height:1.5;text-wrap:pretty}
+.lede b{color:var(--text);font-weight:600}
+.pg-head{padding-top:28px}
+.sec{margin-top:56px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:18px}
+.sec-h p{margin-top:4px;color:var(--soft);font-size:14.5px}
+.more{color:var(--soft);font-size:14px;text-decoration:none;white-space:nowrap}
+.more:hover{color:var(--text)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.note{color:var(--soft2);font-size:13px;line-height:1.5}
+
+/* state symbols */
+.sym{width:19px;height:19px;flex:none;overflow:visible}
+.sym-cool .arw{animation:drop 2.2s ease-in-out infinite}
+@keyframes drop{0%{transform:translateY(-4px);opacity:0}35%,60%{transform:none;opacity:1}100%{transform:translateY(4px);opacity:0}}
+.sym-rise .arw{animation:rise 2.2s ease-in-out infinite}
+@keyframes rise{0%{transform:translateY(4px);opacity:0}35%,60%{transform:none;opacity:1}100%{transform:translateY(-4px);opacity:0}}
+.sym-flat .ln{animation:breathe 2.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes breathe{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.6)}}
+
+/* pill tabs */
+.seg{display:inline-flex;gap:4px;border:1px solid var(--line);border-radius:999px;padding:4px;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.seg::-webkit-scrollbar{display:none}
+.seg button{border:0;background:none;color:var(--soft);font:500 13.5px var(--font);padding:7px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.seg button:hover{color:var(--text)}
+.seg button.on{background:var(--lime);color:var(--on-lime)}
+.ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* token avatar */
+.av{position:relative;flex:none;width:32px;height:32px;border-radius:50%;background:var(--raised);display:grid;place-items:center;overflow:hidden;font:600 12px var(--tight);color:var(--soft)}
+.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.av.s{width:24px;height:24px;font-size:10px}
+
+/* ranked list */
+.rank{list-style:none;margin:0;padding:0}
+.rank li{border-top:1px solid var(--line)}
+.rank li:first-child{border-top:0}
+.row{display:grid;grid-template-columns:18px 32px minmax(0,1fr) minmax(60px,120px) 84px;align-items:center;gap:12px;width:100%;padding:11px 0;border:0;background:none;text-align:left;cursor:pointer}
+.row .n{color:var(--soft2);font-size:12px;font-variant-numeric:tabular-nums}
+.row .tks{font:600 15.5px var(--tight);letter-spacing:-.01em}
+.row .sub{display:block;color:var(--soft2);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .val{text-align:right;font:600 15.5px var(--tight);font-variant-numeric:tabular-nums;white-space:nowrap}
+.row .val small{display:block;color:var(--soft2);font:400 12px var(--font)}
+.bar{height:6px;border-radius:3px;background:var(--raised);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;background:var(--up)}
+.bar.dn i{background:var(--down)}
+.bar.nt i{background:var(--soft)}
+.tag{display:inline-block;padding:1px 7px;border:1px solid var(--line-2);border-radius:99px;color:var(--soft);font-size:11px;font-weight:500;white-space:nowrap}
+.all{margin-top:14px;border:1px solid var(--line);background:none;color:var(--text);font:500 14px var(--font);padding:9px 16px;border-radius:8px;cursor:pointer}
+.all:hover{border-color:var(--line-2)}
+.empty{padding:26px 0;color:var(--soft2);font-size:14px}
+
+/* tables */
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{padding:0 0 12px 16px;border-bottom:1px solid var(--line);color:var(--soft);font-weight:500;font-size:13px;text-align:right;white-space:nowrap}
+.tbl td{padding:13px 0 13px 16px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl th:first-child,.tbl td:first-child{padding-left:0;text-align:left}
+.tbl td b{font-weight:600}
+.scroll{overflow-x:auto}
+.up{color:var(--up-ink)}.dn{color:var(--down-ink)}.mut{color:var(--soft2)}
+.nb{white-space:nowrap}
+/* the small "i": what a number means and how it is scored, for readers who want it */
+.info{flex:none;display:inline-grid;place-items:center;width:16px;height:16px;padding:0;border:1px solid var(--line-2);border-radius:50%;background:none;color:var(--soft);font:500 10px/1 var(--mono);cursor:pointer}
+.info:hover,.info[aria-expanded="true"]{color:var(--text);border-color:var(--soft)}
+.pop{display:none;position:absolute;left:18px;right:18px;top:46px;z-index:6;padding:11px 13px;border:1px solid var(--line-2);border-radius:10px;background:var(--bg);box-shadow:0 10px 30px rgba(0,0,0,.35);color:var(--soft);font-size:13px;line-height:1.45}
+.pop.on{display:block}
+@media (hover:hover){*:has(>.k>.info:hover)>.pop{display:block}}
+/* a 0-100 score as a level, in the site's ASCII */
+.am{position:relative;height:26px;margin-top:16px}
+.am pre{position:absolute;inset:0;margin:0;font:11px/13px var(--mono);white-space:pre;overflow:hidden;letter-spacing:0}
+.am-t{color:var(--soft2);opacity:.6}
+.am-f{color:var(--lime-ink)}
+
+/* tool pages: controls, stand-out cards, a ranked list with the picked token's detail beside it */
+.pg-ctl{margin-top:26px}
+.chip{border:1px solid var(--line);border-radius:999px;background:none;color:var(--soft);font:500 13.5px var(--font);padding:10px 15px;cursor:pointer}
+.chip.on{background:var(--raised);color:var(--text)}
+.look{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.lk{display:block;width:100%;padding:18px 20px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);text-align:left;cursor:pointer}
+.lk:hover{border-color:var(--line-2)}
+.lk-t{display:flex;align-items:center;gap:10px;font:600 16px var(--tight);letter-spacing:-.01em}
+.lk-l{display:block;margin-top:12px;font:500 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--soft2)}
+.lk-x{display:block;margin-top:5px;font-size:15px;line-height:1.4}
+.md{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;align-items:start}
+.md-list .sec-h{align-items:center;margin-bottom:12px}
+.md-sum{color:var(--soft);font-size:14px}
+.md-list .panel{padding:8px 22px}
+.md-list .row{grid-template-columns:18px 32px minmax(0,1fr) minmax(40px,150px) 124px;padding:12px;margin:0 -12px;width:calc(100% + 24px);border-radius:10px}
+.md-list .row:hover{background:var(--hover)}
+.md-list li.sel>.row{background:var(--raised)}
+.md-list li.sel,.md-list li.sel+li{border-top-color:transparent}
+.row .star{color:var(--lime-ink);margin-right:5px;font-size:11px}
+.row .sub.tg{color:var(--soft)}
+.insp{position:sticky;top:calc(env(safe-area-inset-top,0px) + 88px);padding:22px 24px}
+.i-h{display:flex;align-items:center;gap:12px}
+.i-h .av{width:40px;height:40px;font-size:14px}
+.i-h b{display:block;font:600 22px/1.2 var(--tight);letter-spacing:-.02em}
+.i-h small{color:var(--soft2);font-size:13px}
+.i-h a{margin-left:auto;color:var(--soft);text-decoration:none;font-size:13px;white-space:nowrap}
+.i-h a:hover{color:var(--text)}
+.i-k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.i-k div{padding:14px 0 13px 16px;border-left:1px solid var(--line);min-width:0}
+.i-k div:first-child{border-left:0;padding-left:0}
+.i-k span{display:block;color:var(--soft);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.i-k b{display:block;margin-top:3px;font:600 22px var(--tight);letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.i-s{margin-top:18px;font-size:14.5px;line-height:1.45}
+.i-s+.i-s{margin-top:6px}
+.i-t{margin-top:22px;font:500 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--soft2)}
+.cg{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px 12px;align-items:center;margin-top:12px;font-size:13.5px}
+.cg span:first-child{color:var(--soft)}
+.cg b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.zb{position:relative;height:6px;border-radius:3px;background:var(--raised)}
+.zb::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--line-2)}
+.zb i{position:absolute;top:0;bottom:0;border-radius:3px}
+.zb i.u{left:50%;background:var(--up)}
+.zb i.d{right:50%;background:var(--down)}
+.facts{display:flex;gap:6px 22px;flex-wrap:wrap;margin-top:14px;color:var(--soft);font-size:13px}
+.facts b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.det-f{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:20px}
+.wbtn{border:1px solid var(--line);border-radius:8px;background:none;color:var(--text);font:500 13px var(--font);padding:7px 12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+.wbtn:hover{border-color:var(--line-2)}
+.inl{padding:2px 0 20px}
+.inl .i-h{display:none}
+
+/* how it works */
+details.how{margin-top:56px;border:1px solid var(--line);border-radius:10px;padding:18px 22px}
+details.how summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;font:600 17px var(--tight)}
+details.how summary::-webkit-details-marker{display:none}
+details.how summary::after{content:"+";color:var(--soft);font:400 20px var(--font)}
+details.how[open] summary::after{content:"\2212"}
+details.how dl{display:grid;grid-template-columns:180px 1fr;gap:12px 24px;margin-top:18px;max-width:900px;font-size:14px}
+details.how dt{font-weight:600}
+details.how dd{color:var(--soft)}
+
+footer{margin-top:64px;padding-block:22px 40px;border-top:1px solid var(--line);color:var(--soft);font-size:13px;display:flex;gap:8px 32px;flex-wrap:wrap;justify-content:space-between}
+footer span{max-width:70ch}
+
+[data-view][hidden]{display:none!important}
+@media (max-width:900px){
+  .wrap{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+  h1{font-size:44px}
+  .hd .wrap{gap:12px;height:60px}
+  .stamp,.brand em,.brand u{display:none}
+  .brand .rh{color:var(--text)}
+  .nav{margin-left:auto}
+  .hd-r{margin-left:0}
+  .sheet{left:max(20px,env(safe-area-inset-left,0px));right:max(20px,env(safe-area-inset-right,0px));width:auto;grid-template-columns:1fr}
+  .grid2{grid-template-columns:1fr}
+  .sec{margin-top:44px}
+  .panel{padding:18px}
+  .look{grid-template-columns:1fr}
+  .md{grid-template-columns:1fr}
+  .insp{display:none}
+  .md-list .row{grid-template-columns:18px 32px minmax(0,1fr) 120px;margin:0 -8px;padding:12px 8px;width:calc(100% + 16px)}
+  .md-list .row .bar{display:none}
+  .md-list .panel{padding:6px 16px}
+  details.how dl{grid-template-columns:1fr;gap:4px 0}
+  details.how dd{margin-bottom:12px}
 }
-render();
-</script><!--/flows-->
-</body></html>
+@media (max-width:520px){
+  h1{font-size:38px}
+  .lede{font-size:16.5px}
+  .row{grid-template-columns:18px 32px minmax(0,1fr) 84px}
+  .row .bar{display:none}
+  .nav [data-top="home"]{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.pt{margin-top:10px}
+.pt-r{padding:11px 0;border-top:1px solid var(--line)}
+.pt-r:first-child{border-top:0}
+.pt-t{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14px;font-weight:500}
+.pt-t small{color:var(--ink-3);font-weight:400;font-size:12.5px;margin-left:6px}
+.pt-t b{font-weight:620;font-variant-numeric:tabular-nums}
+.pt-b{height:4px;margin:8px 0 7px;border-radius:2px;background:var(--raised)}
+.pt-b i{display:block;height:100%;border-radius:2px;background:var(--ink-2)}
+.pt-r p{margin:0;color:var(--ink-3);font-size:12.5px;line-height:1.4}
+.st{display:flex;gap:2px;height:10px;margin-top:12px}
+.st i{display:block;min-width:2px;border-radius:2px}
+.st .s0,.sk .s0{background:var(--down)}
+.st .s1,.sk .s1{background:color-mix(in srgb,var(--down) 42%,var(--raised))}
+.st .s2,.sk .s2{background:color-mix(in srgb,var(--up) 42%,var(--raised))}
+.st .s3,.sk .s3{background:var(--up)}
+.sk{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-top:12px;font-size:12.5px;color:var(--ink-2)}
+.sk span{display:flex;align-items:center;gap:7px}
+.sk i{display:inline-block;flex:none;width:9px;height:9px;border-radius:3px}
+.sk b{margin-left:auto;color:var(--ink);font-weight:550;font-variant-numeric:tabular-nums}
+.val .dl{font-size:12px;color:var(--ink-3);font-weight:400}
+.val .dl i{font-style:normal;font-size:8px;vertical-align:1px;margin-right:3px}
+</style></head><body>
+<header class="hd"><div class="wrap">
+<a class="brand" href="/" data-nav="home" aria-label="State of Robinhood Chain, by State of Blocks"><span class="mark" aria-hidden="true"><svg viewBox="0 0 96 96"><g transform="translate(13 13) scale(0.73)"><path fill="currentColor" d="M80.4 43.8 L64.9 37.0 L50.0 42.9 Q50.6 49.6 45.5 59.7 L15.7 72.9 L15.6 84.4 L33.2 91.9 L80.0 71.3 Z M80.3 11.2 L62.7 4.0 L15.7 22.8 L15.6 48.9 L31.9 56.4 L43.8 51.8 Q43.4 45.4 47.4 36.8 L52.6 33.2 L80.2 22.3 Z"/></g></svg></span><em style="font-style:normal">State of Blocks</em><u></u><span class="rh">Robinhood Chain</span></a>
+<nav class="nav" aria-label="Main">
+<a href="/" data-nav="home" data-top="home">Overview</a>
+<button type="button" id="tools-btn" aria-expanded="false" aria-controls="tools-menu" data-top="tools" class="on"><span id="tools-label">Holders</span><svg width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</nav>
+<div class="hd-r"><span class="stamp">Data through Nov 22</span><button class="theme" id="theme-btn" type="button" aria-label="Switch theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor" stroke="none"/></svg></button></div>
+</div><div class="menu" id="tools-menu" hidden><div class="wrap"><div class="sheet" role="menu" aria-label="Tools"><div><h4>Tokens</h4><a href="/flows" data-nav="flows"><b>Flows</b><span>Who is buying and selling</span></a><a href="/smart-money" data-nav="smart-money"><b>Smart money</b><span>What the best wallets hold and trade</span></a><a href="/holders" data-nav="holders" class="on"><b>Holders</b><span>How firmly each token is held</span></a></div><div><h4>Ecosystem</h4><a href="/projects" data-nav="projects"><b>Projects</b><span>Revenue and what the market pays</span></a><a href="/stock-tokens" data-nav="stock-tokens"><b>Economies</b><span>Stock tokens, agents, launchpads, DEXs and hooks</span></a><a href="/map" data-nav="map"><b>Map</b><span>Every project, by what it does</span></a></div></div></div></div></header>
+<main class="wrap" data-view="holders">
+<section class="pg-head">
+<p class="eyebrow">Holders · through Nov 22</p>
+<h1 id="h-h"></h1>
+<p class="lede" id="h-p"></p>
+</section>
+
+<section class="sec">
+<div class="md">
+<div class="md-list"><div class="sec-h"><div class="seg" id="h-sort" role="group" aria-label="Order"></div><p class="md-sum">Holder strength, 0 to 100</p></div>
+<div class="panel"><ol class="rank" id="h-rows"></ol></div></div>
+<aside class="panel insp" id="h-insp" aria-live="polite"></aside>
+</div>
+</section>
+
+<details class="how"><summary>How this is measured</summary><dl>
+<dt>Who is a holder</dt><dd>Wallets only. Pools, other contracts and burn addresses are left out. Balances are rebuilt from every transfer since the token's first pool and match its total supply.</dd>
+<dt>Conviction (35%)</dt><dd>Share of holder supply held 30+ days by wallets that moved none out in that time. 0% scores 0, 80% scores 100.</dd>
+<dt>Top holders (25%)</dt><dd>How the 50 largest holders of a week ago changed their combined balance. −10% scores 0, flat scores 50, +10% scores 100.</dd>
+<dt>Breadth (20%)</dt><dd>Holders worth $10+ against a week ago, averaged with the share of last week's new holders who are still in.</dd>
+<dt>In profit (20%)</dt><dd>Share of holder supply whose last top-up was at or below today's price.</dd>
+<dt>Where holders stand</dt><dd>Each holder's entry is the price on the day they last added. Supply is split by how far today's price is from that entry; the average holder's result is today's price against the supply-weighted average entry. Not part of the score.</dd>
+<dt>Included</dt><dd>Crypto tokens on Robinhood Chain with $50K+ of pool liquidity and 30+ days of daily prices. Left out today (too few daily prices: INU).</dd>
+</dl></details>
+</main>
+<footer class="wrap"><span>State of Robinhood Chain, by State of Blocks. Research by that1618guy, Marcus. Independent research. Not affiliated with or endorsed by Robinhood. <a href="/methodology">Methodology</a></span><span>Sources: Robinhood Chain, read directly (stock-token supply, the ERC-8004 agent registry); GeckoTerminal (prices, pool volume, holders); DefiLlama (TVL, fees, revenue, DEX volume); Priors (self-reported credit data). Updated daily, through the last full day (UTC). Disclosure: the author holds PRIORS, BUN, RAETO and PONS.</span></footer>
+<script type="application/json" id="sob-tokens">{"CASHCAT":{"name":"Cash Cat","address":"0x020bfc650a365f8bb26819deaabf3e21291018b4","img":"/logos/CASHCAT.jpg","price":0.04281219276,"fdv":42280280.2731996,"mcap":42280280.2731996,"liq":1599066.7582658937},"WALLET":{"name":"Wallet","address":"0x0339f5459fc690ac85f1782e15782a151b4a9e1b","img":"https://assets.geckoterminal.com/cde3u2wi9fh5hbkmo3k3tq2awb36","price":0.009356648547,"fdv":9356648.54718645,"mcap":null,"liq":768452.9145156938},"AI":{"name":"Artificial Inu","address":"0x2e8c31162b855a2ffa90f6f8634643ad6f111e18","img":"/logos/AI.png","price":0.01825613195,"fdv":18044797.5648008,"mcap":18082476.0984171,"liq":1341692.1917234669},"HMM":{"name":"Thinking Cat","address":"0x7fe995a80075df3dc8ae11a9b82c7fe4202cd87f","img":"/logos/HMM.jpg","price":0.007145845885,"fdv":7057998.73579735,"mcap":7145845.88492385,"liq":185262.70732923652},"BONER":{"name":"Boner Coin","address":"0x98096d17e191b3da1d5f99a6d7b3584351b11e18","img":"/logos/BONER.jpg","price":0.002338701254,"fdv":2338561.13847228,"mcap":2338575.7158201,"liq":334623.7784508905},"TENDIES":{"name":"TENDIES","address":"0x45242320dbb855eea8fd36804c6487e10e97fcf9","img":"/logos/TENDIES.png","price":0.002305996476,"fdv":2196603.58014331,"mcap":2305996.47644408,"liq":212762.25391240962},"MEME":{"name":"A Meme Coin","address":"0x385f4f8ae47651ce5f58f5265395a669f8281e18","img":"/logos/MEME.jpg","price":0.002434304529,"fdv":2434302.72253135,"mcap":2434304.52902899,"liq":445162.8955504516},"UBIK":{"name":"ubik","address":"0x812486eaea648819853f8e372dc9f1516c7868bd","img":"/logos/UBIK.webp","price":0.002355791403,"fdv":2355738.52066753,"mcap":2355739.17846362,"liq":165439.64485547377},"MONITOR":{"name":"The Situation","address":"0x1a911bb954daa9cb38513423075be74450351e18","img":"/logos/MONITOR.jpg","price":0.0003479256599,"fdv":347925.659883402,"mcap":null,"liq":91991.94898607767},"MOO":{"name":"Memory cow Moo","address":"0xd9db30bb0d2b8d2eae3826a1372117e058791e18","img":"/logos/MOO.jpg","price":0.0004565730607,"fdv":450261.784696765,"mcap":450485.876255804,"liq":140407.7302043238},"SCHIFFY":{"name":"SCHIFFY","address":"0x42afa2124ca5a2b83898e46b2da9a190995b1e18","img":"/logos/SCHIFFY.jpg","price":0.001213857583,"fdv":1201369.06027587,"mcap":1194898.32426609,"liq":178994.46561545008},"INU":{"name":"iNu","address":"0x63ee32ac3077d1fbd8a77ebba2a6ed4b8e9c1e18","img":"/logos/INU.jpg","price":0.0002874021378,"fdv":285899.315617117,"mcap":0.0,"liq":108396.99591074637},"PONS":{"name":"Pons","address":"0x39dbed3a2bd333467115de45665cc57f813c4571","img":"/logos/PONS.jpg","price":0.09661065928,"fdv":64594269.1465195,"mcap":64595677.0798912,"liq":2241470.1371302702},"MOW":{"name":"MowCat","address":"0x0b7c6c138dc75622f4200d157b13fb93e6bd94fa","img":"/logos/MOW.jpg","price":0.1877034882,"fdv":187703488.236368,"mcap":0.0,"liq":53214.6827536565},"PRIORS":{"name":"Priors Agents","address":"0xedbf91223639800bcd5756815caf908df3b890be","img":"/logos/PRIORS.jpg","price":0.003345532648,"fdv":3345529.79158452,"mcap":3072427.66401772,"liq":384354.3653650177},"RAETO":{"name":"Raeto","address":"0x72be1277e198d0c476869253cb4e62807e14533c","img":"/logos/RAETO.jpg","price":0.0007701034414,"fdv":770094.529707006,"mcap":770103.441372745,"liq":66027.0196956486},"ORBIO":{"name":"Orbio.so","address":"0xaa07a0e9209e16ac99708c3ec70159c6ef3128a3","img":"/logos/ORBIO.jpg","price":0.01263574498,"fdv":12003945.6678431,"mcap":12003957.7319873,"liq":547438.9105399018},"BUN":{"name":"Bundle Cat","address":"0x07ebb29a38fbcb41563817e5e19f2cec619c90d2","img":"/logos/BUN.png","price":0.01629991079,"fdv":16299778.3721122,"mcap":3365044.39055393,"liq":254243.20329483724},"STANDARD":{"name":"The Standard Reserve","address":"0x88ad8ddf1e3898412146a534538d418c6f8a9062","img":"/logos/STANDARD.png","price":0.1036808331,"fdv":8298461.80268105,"mcap":8297561.95515743,"liq":4336508.570294851}}</script><script type="application/json" id="holders-data">{"asof":"2026-11-22","tokens":[{"s":"AI","score":45.9,"d":-9.6,"parts":{"conviction":62.5,"top":30.4,"breadth":63.2,"profit":19.1},"was":{"conviction":61.8,"top":70.6,"breadth":58.7,"profit":22.3},"f":{"conviction":50.0,"top_chg":-3.9,"holders":7885,"holders_chg":-1.5,"kept":67.2,"new":656,"in_profit":19.1,"top10":17.7,"stand":[41.9,39.1,19.1,0.0],"avg_pl":-74.1},"moved":"The 50 largest holders cut 3.9% this week, after adding 4.1% the week before.","chg":-34.8},{"s":"BONER","score":50.1,"d":10.3,"parts":{"conviction":72.2,"top":35.0,"breadth":59.7,"profit":20.9},"was":{"conviction":70.3,"top":7.2,"breadth":48.8,"profit":18.3},"f":{"conviction":57.7,"top_chg":-3.0,"holders":2308,"holders_chg":-2.7,"kept":66.1,"new":127,"in_profit":20.9,"top10":22.7,"stand":[71.6,7.4,20.9,0.0],"avg_pl":-91.2},"moved":"The 50 largest holders cut 3.0% this week, less than the 8.6% the week before.","chg":-32.1},{"s":"BUN","score":46.1,"d":0.7,"parts":{"conviction":13.7,"top":50.0,"breadth":60.4,"profit":83.8},"was":{"conviction":14.0,"top":48.7,"breadth":57.8,"profit":83.9},"f":{"conviction":11.0,"top_chg":-0.0,"holders":1512,"holders_chg":-2.2,"kept":65.5,"new":55,"in_profit":83.8,"top10":82.9,"stand":[9.0,7.2,82.9,0.9],"avg_pl":-19.9},"moved":"Little changed this week.","chg":-12.6},{"s":"CASHCAT","score":48.8,"d":0.7,"parts":{"conviction":46.5,"top":44.6,"breadth":67.8,"profit":39.0},"was":{"conviction":47.6,"top":49.0,"breadth":64.0,"profit":31.7},"f":{"conviction":37.2,"top_chg":-1.1,"holders":12120,"holders_chg":0.0,"kept":68.4,"new":664,"in_profit":39.0,"top10":41.3,"stand":[49.6,11.4,36.2,2.8],"avg_pl":-49.6},"moved":"39% of holder supply is in profit, up from 32% a week ago.","chg":6.3},{"s":"HMM","score":61.1,"d":-2.0,"parts":{"conviction":86.1,"top":51.1,"breadth":48.3,"profit":42.8},"was":{"conviction":84.6,"top":53.9,"breadth":53.5,"profit":46.6},"f":{"conviction":68.9,"top_chg":0.2,"holders":3815,"holders_chg":-1.6,"kept":43.6,"new":195,"in_profit":42.8,"top10":22.2,"stand":[17.6,39.5,31.7,11.1],"avg_pl":-27.5},"moved":"Holders worth $10+ shrank 1.6% to 3,815, and 44% of last week's new holders are still in.","chg":-3.4},{"s":"MEME","score":41.7,"d":-4.0,"parts":{"conviction":75.8,"top":0.0,"breadth":59.7,"profit":16.3},"was":{"conviction":79.8,"top":19.7,"breadth":47.2,"profit":17.0},"f":{"conviction":60.6,"top_chg":-13.2,"holders":3016,"holders_chg":-1.3,"kept":60.8,"new":97,"in_profit":16.3,"top10":22.9,"stand":[62.5,21.2,16.3,0.0],"avg_pl":-88.2},"moved":"The 50 largest holders cut 13.2% this week, more than the 6.1% the week before.","chg":-24.5},{"s":"MONITOR","score":49.8,"d":-2.0,"parts":{"conviction":82.8,"top":29.3,"breadth":52.8,"profit":14.8},"was":{"conviction":79.9,"top":55.8,"breadth":29.6,"profit":20.0},"f":{"conviction":66.3,"top_chg":-4.1,"holders":382,"holders_chg":-2.1,"kept":52.6,"new":19,"in_profit":14.8,"top10":25.8,"stand":[57.7,27.5,14.8,0.0],"avg_pl":-80.1},"moved":"The 50 largest holders cut 4.1% this week, after adding 1.2% the week before.","chg":-22.9},{"s":"MOO","score":44.7,"d":-6.2,"parts":{"conviction":80.3,"top":13.1,"breadth":55.6,"profit":11.2},"was":{"conviction":76.2,"top":38.3,"breadth":50.6,"profit":22.6},"f":{"conviction":64.2,"top_chg":-7.4,"holders":1256,"holders_chg":-3.5,"kept":63.2,"new":57,"in_profit":11.2,"top10":21.4,"stand":[67.8,21.0,11.2,0.0],"avg_pl":-93.5},"moved":"The 50 largest holders cut 7.4% this week, more than the 2.3% the week before.","chg":-35.5},{"s":"MOW","score":85.6,"d":32.1,"parts":{"conviction":100.0,"top":42.4,"breadth":100.0,"profit":99.9},"was":{"conviction":100.0,"top":31.6,"breadth":50.0,"profit":2.9},"f":{"conviction":97.1,"top_chg":-1.5,"holders":13046,"holders_chg":19.4,"kept":99.9,"new":6564,"in_profit":99.9,"top10":3.5,"stand":[0.0,0.1,99.9,0.0],"avg_pl":15.3},"moved":"100% of holder supply is in profit, up from 3% a week ago.","chg":20.7},{"s":"ORBIO","score":47.6,"d":-1.9,"parts":{"conviction":69.3,"top":14.1,"breadth":66.0,"profit":33.1},"was":{"conviction":65.6,"top":35.5,"breadth":66.0,"profit":22.3},"f":{"conviction":55.4,"top_chg":-7.2,"holders":3087,"holders_chg":0.6,"kept":63.2,"new":307,"in_profit":33.1,"top10":26.6,"stand":[57.7,9.2,33.1,0.0],"avg_pl":-65.8},"moved":"The 50 largest holders cut 7.2% this week, more than the 2.9% the week before.","chg":-46.5},{"s":"PONS","score":45.6,"d":-0.3,"parts":{"conviction":40.9,"top":40.4,"breadth":68.2,"profit":37.6},"was":{"conviction":44.0,"top":52.7,"breadth":63.3,"profit":23.3},"f":{"conviction":32.7,"top_chg":-1.9,"holders":18590,"holders_chg":-1.0,"kept":72.9,"new":757,"in_profit":37.6,"top10":37.0,"stand":[41.4,21.0,37.6,0.0],"avg_pl":-41.3},"moved":"The 50 largest holders cut 1.9% this week, after adding 0.5% the week before.","chg":-23.4},{"s":"PRIORS","score":32.8,"d":0.7,"parts":{"conviction":38.3,"top":0.0,"breadth":63.0,"profit":34.1},"was":{"conviction":34.8,"top":0.0,"breadth":64.2,"profit":35.2},"f":{"conviction":30.6,"top_chg":-12.1,"holders":2043,"holders_chg":-1.1,"kept":65.1,"new":255,"in_profit":34.1,"top10":19.0,"stand":[40.5,25.3,34.0,0.1],"avg_pl":-48.1},"moved":"Conviction rose: 31% of holder supply has sat untouched for 30+ days, from 28% a week ago.","chg":-34.9},{"s":"RAETO","score":28.2,"d":2.6,"parts":{"conviction":21.1,"top":4.3,"breadth":66.0,"profit":32.9},"was":{"conviction":3.1,"top":0.0,"breadth":53.0,"profit":69.4},"f":{"conviction":16.9,"top_chg":-9.1,"holders":725,"holders_chg":0.0,"kept":65.5,"new":119,"in_profit":32.9,"top10":27.4,"stand":[30.6,36.5,29.3,3.6],"avg_pl":-37.6},"moved":"Conviction rose: 17% of holder supply has sat untouched for 30+ days, from 2% a week ago.","chg":-55.5},{"s":"SCHIFFY","score":38.6,"d":-1.6,"parts":{"conviction":45.7,"top":29.0,"breadth":66.4,"profit":10.2},"was":{"conviction":43.0,"top":42.1,"breadth":61.8,"profit":11.2},"f":{"conviction":36.6,"top_chg":-4.2,"holders":1062,"holders_chg":-3.5,"kept":80.3,"new":66,"in_profit":10.2,"top10":20.1,"stand":[53.2,36.6,10.2,0.0],"avg_pl":-58.1},"moved":"The 50 largest holders cut 4.2% this week, more than the 1.6% the week before.","chg":-24.1},{"s":"STANDARD","score":45.2,"d":8.7,"parts":{"conviction":83.0,"top":10.6,"breadth":65.9,"profit":1.6},"was":{"conviction":75.8,"top":0.0,"breadth":45.9,"profit":3.8},"f":{"conviction":66.4,"top_chg":-7.9,"holders":1314,"holders_chg":-3.1,"kept":77.8,"new":54,"in_profit":1.6,"top10":39.9,"stand":[70.8,27.7,1.6,0.0],"avg_pl":-53.6},"moved":"Holders worth $10+ shrank 3.1% to 1,314, and 78% of last week's new holders are still in.","chg":-11.5},{"s":"TENDIES","score":55.3,"d":1.3,"parts":{"conviction":88.7,"top":29.7,"breadth":63.6,"profit":20.4},"was":{"conviction":92.4,"top":27.4,"breadth":59.4,"profit":14.5},"f":{"conviction":71.0,"top_chg":-4.1,"holders":2072,"holders_chg":-1.6,"kept":68.2,"new":88,"in_profit":20.4,"top10":18.2,"stand":[47.5,32.1,18.6,1.8],"avg_pl":-73.0},"moved":"20% of holder supply is in profit, up from 14% a week ago.","chg":-29.2},{"s":"UBIK","score":41.5,"d":-13.8,"parts":{"conviction":79.8,"top":0.0,"breadth":56.3,"profit":11.4},"was":{"conviction":81.2,"top":48.8,"breadth":53.3,"profit":20.0},"f":{"conviction":63.9,"top_chg":-10.9,"holders":1659,"holders_chg":-3.8,"kept":65.2,"new":66,"in_profit":11.4,"top10":28.0,"stand":[63.2,25.4,11.4,0.0],"avg_pl":-67.5},"moved":"The 50 largest holders cut 10.9% this week, more than the 0.2% the week before.","chg":-40.7},{"s":"WALLET","score":59.5,"d":0.0,"parts":{"conviction":78.5,"top":45.5,"breadth":72.2,"profit":31.0},"was":{"conviction":74.3,"top":57.3,"breadth":61.3,"profit":34.4},"f":{"conviction":62.8,"top_chg":-0.9,"holders":3408,"holders_chg":-0.9,"kept":78.9,"new":114,"in_profit":31.0,"top10":16.5,"stand":[31.4,37.6,23.4,7.6],"avg_pl":-43.7},"moved":"The 50 largest holders cut 0.9% this week, after adding 1.5% the week before.","chg":-11.8}],"read":{"h":"Holders are holding steady.","p":"<b>MOW<\/b> has the firmest holders of the 18 tokens we score (86 out of 100), RAETO the weakest (28). Scores fell for 8 of 18 this week; MOW moved most (+32) as supply in profit rose to 100%. The average holder is underwater in 17 of 18."},"labels":{"conviction":"Conviction","top":"Top holders","breadth":"Breadth","profit":"In profit"},"weights":{"conviction":35,"top":25,"breadth":20,"profit":20},"stand":["Down 50% or more","Down less than 50%","Up less than 2\u00d7","Up 2\u00d7 or more"],"names":{"CASHCAT":"Cash Cat","WALLET":"Wallet","AI":"Artificial Inu","HMM":"Thinking Cat","BONER":"Boner Coin","TENDIES":"TENDIES","MEME":"A Meme Coin","UBIK":"ubik","MONITOR":"The Situation","MOO":"Memory cow Moo","SCHIFFY":"SCHIFFY","INU":"iNu","PONS":"Pons","MOW":"MowCat","PRIORS":"Priors Agents","RAETO":"Raeto","ORBIO":"Orbio.so","BUN":"Bundle Cat","STANDARD":"The Standard Reserve"},"addr":{"CASHCAT":"0x020bfc650a365f8bb26819deaabf3e21291018b4","WALLET":"0x0339f5459fc690ac85f1782e15782a151b4a9e1b","AI":"0x2e8c31162b855a2ffa90f6f8634643ad6f111e18","HMM":"0x7fe995a80075df3dc8ae11a9b82c7fe4202cd87f","BONER":"0x98096d17e191b3da1d5f99a6d7b3584351b11e18","TENDIES":"0x45242320dbb855eea8fd36804c6487e10e97fcf9","MEME":"0x385f4f8ae47651ce5f58f5265395a669f8281e18","UBIK":"0x812486eaea648819853f8e372dc9f1516c7868bd","MONITOR":"0x1a911bb954daa9cb38513423075be74450351e18","MOO":"0xd9db30bb0d2b8d2eae3826a1372117e058791e18","SCHIFFY":"0x42afa2124ca5a2b83898e46b2da9a190995b1e18","INU":"0x63ee32ac3077d1fbd8a77ebba2a6ed4b8e9c1e18","PONS":"0x39dbed3a2bd333467115de45665cc57f813c4571","MOW":"0x0b7c6c138dc75622f4200d157b13fb93e6bd94fa","PRIORS":"0xedbf91223639800bcd5756815caf908df3b890be","RAETO":"0x72be1277e198d0c476869253cb4e62807e14533c","ORBIO":"0xaa07a0e9209e16ac99708c3ec70159c6ef3128a3","BUN":"0x07ebb29a38fbcb41563817e5e19f2cec619c90d2","STANDARD":"0x88ad8ddf1e3898412146a534538d418c6f8a9062"},"gt":"https://www.geckoterminal.com/robinhood/tokens/","links":{"flows":"/flows","smart":"/smart-money"}}</script>
+<script>
+window.SOB=(function(){
+ const fm=x=>{const a=Math.abs(x);return a>=1e9?'$'+(a/1e9).toFixed(2)+'B':a>=1e8?'$'+Math.round(a/1e6)+'M':a>=1e6?'$'+(a/1e6).toFixed(1)+'M':a>=1e4?'$'+Math.round(a/1e3)+'K':a>=1e3?'$'+(a/1e3).toFixed(1)+'K':'$'+Math.round(a)};
+ const signed=x=>(x>=0?'+':'−')+fm(x);
+ const pct=(x,d)=>x==null?'—':(x>=0?'+':'−')+Math.abs(x).toFixed(d==null?(Math.abs(x)<10?1:0):d)+'%';
+ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ let TOK={};
+ const av=(sym,cls)=>{const t=TOK[sym]||{};return `<span class="av ${cls||''}" aria-hidden="true">${esc(sym.slice(0,1))}${t.img?`<img src="${esc(t.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:''}</span>`};
+ const seg=(el,opts,cur,on)=>{el.innerHTML=opts.map(([v,l])=>`<button type="button" data-v="${v}" class="${v===cur?'on':''}" aria-pressed="${v===cur}">${l}</button>`).join('');
+  el.onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.v!==cur)on(b.dataset.v)}};
+ const KEY='sob-rh-watch';
+ const watch={get(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){return []}},
+  toggle(s){const w=new Set(this.get());w.has(s)?w.delete(s):w.add(s);try{localStorage.setItem(KEY,JSON.stringify([...w]))}catch(e){}return w.has(s)}};
+ const day=iso=>{const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return m[+iso.slice(5,7)-1]+' '+(+iso.slice(8,10))};
+ /* a 0-100 score as a level in ASCII: ascii() leaves a placeholder, fit() draws it to the width it was given */
+ const ascii=(score,rows)=>`<div class="am" aria-hidden="true" data-score="${score}" data-rows="${rows||2}"><pre class="am-t"></pre><pre class="am-f"></pre></div>`;
+ let CW=0;
+ const fit=scope=>{(scope||document).querySelectorAll('.am').forEach(el=>{const tr=el.children[0],fl=el.children[1];if(!el.clientWidth)return;
+   if(!CW){const c=document.createElement('canvas').getContext('2d');c.font=getComputedStyle(tr).font;CW=c.measureText('MMMMMMMMMM').width/10||6.6}
+   const R='.:-=+*#%',cols=Math.max(10,Math.floor(el.clientWidth/CW)),e=Math.round(+el.dataset.score/100*(cols-1)),rows=+el.dataset.rows||2;let f='',t='';
+   for(let c=0;c<cols;c++){if(c<=e){f+=R.charAt(Math.max(0,Math.min(7,Math.floor((1-c/(e+1))*8))));t+=' '}else{f+=' ';t+=(c%2?':':'.')}}
+   const rep=x=>Array(rows).fill(x).join('\n');tr.textContent=rep(t);fl.textContent=rep(f)})};
+ return {fm,signed,pct,esc,av,seg,watch,day,ascii,fit,tokens(t){TOK=t},tok:s=>TOK[s]||{}};
+})();
+(function(){
+ const btn=document.getElementById('tools-btn'),menu=document.getElementById('tools-menu');
+ if(!btn)return;
+ const set=o=>{menu.hidden=!o;btn.setAttribute('aria-expanded',o)};
+ btn.addEventListener('click',e=>{e.stopPropagation();set(menu.hidden)});
+ document.addEventListener('click',e=>{if(!menu.hidden&&!e.target.closest('.sheet'))set(false)});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){set(false);btn.focus()}});
+ menu.addEventListener('click',e=>{if(e.target.closest('a'))set(false)});
+ const pop=b=>document.getElementById(b.getAttribute('aria-controls'));
+ const shut=except=>document.querySelectorAll('.info[aria-expanded="true"]').forEach(x=>{if(x!==except){x.setAttribute('aria-expanded','false');const p=pop(x);if(p)p.classList.remove('on')}});
+ document.addEventListener('click',e=>{const b=e.target.closest('.info');shut(b);if(!b)return;const o=b.getAttribute('aria-expanded')==='true',p=pop(b);b.setAttribute('aria-expanded',String(!o));if(p)p.classList.toggle('on',!o)});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')shut(null)});
+ const th=document.getElementById('theme-btn');
+ if(th){const R=document.documentElement;
+  try{if(localStorage.getItem('sob-theme')==='light')R.classList.add('light')}catch(e){}
+  th.addEventListener('click',()=>{const l=R.classList.toggle('light');try{localStorage.setItem('sob-theme',l?'light':'dark')}catch(e){};window.dispatchEvent(new Event('sob:theme'))})}
+})();
+SOB.tokens(JSON.parse(document.getElementById('sob-tokens').textContent));
+(function(){
+ const root=document.querySelector('[data-view="holders"]');if(!root)return;
+ const D=JSON.parse(document.getElementById('holders-data').textContent),$=id=>root.querySelector('#'+id);
+ const {fm,signed,pct,esc,av}=SOB,narrow=window.matchMedia('(max-width:860px)'),K=['conviction','top','breadth','profit'];
+ const S={sort:'top',open:null,all:false},TOP=10;
+ const dl=d=>Math.abs(d)<0.5?'no change this week':`<i class="${d>0?'up':'dn'}">${d>0?'▲':'▼'}</i>${Math.abs(d).toFixed(0)} this week`;
+ function fact(k,f){
+  if(k==='conviction')return `${f.conviction.toFixed(0)}% of holder supply has sat untouched for 30+ days.`;
+  if(k==='top')return Math.abs(f.top_chg)<0.05?'The 50 largest holders were flat this week.':`The 50 largest holders ${f.top_chg>=0?'added':'cut'} ${Math.abs(f.top_chg).toFixed(1)}% this week. The top 10 hold ${f.top10.toFixed(0)}%.`;
+  if(k==='breadth')return `${f.holders.toLocaleString()} holders worth $10+, ${pct(f.holders_chg)} on the week${f.kept==null?'':`; ${f.kept.toFixed(0)}% of last week's new holders stayed`}.`;
+  return `${f.in_profit.toFixed(0)}% of holder supply was last added at or below today's price.`}
+ function row(t,i){
+  const on=S.open===t.s,inl=on&&narrow.matches,star=SOB.watch.get().includes(t.s)?'<span class="star">★</span>':'';
+  return `<li class="${on?'sel':''}"><button type="button" class="row" data-s="${t.s}" aria-pressed="${on}"><span class="n">${i}</span>${av(t.s)}
+   <span><span class="tks">${star}${esc(t.s)}</span><span class="sub">${esc(D.names[t.s]||t.s)}</span></span>
+   <span class="bar nt"><i style="width:${Math.max(t.score,2).toFixed(0)}%"></i></span>
+   <span class="val">${t.score.toFixed(0)}<small class="dl">${dl(t.d)}</small></span></button>${inl?`<div class="inl">${detail(t)}</div>`:''}</li>`}
+ function detail(t){
+  const f=t.f,w=SOB.watch.get().includes(t.s);
+  const parts=K.map(k=>`<div class="pt-r"><div class="pt-t"><span>${D.labels[k]}<small>${D.weights[k]}% of the score</small></span><b>${t.parts[k].toFixed(0)}</b></div><div class="pt-b" role="img" aria-label="${t.parts[k].toFixed(0)} out of 100"><i style="width:${Math.max(t.parts[k],2)}%"></i></div><p>${fact(k,f)}</p></div>`).join('');
+  const st=f.stand?`<p class="i-t">Where holders stand against their entry</p><div class="st" role="img" aria-label="Holder supply by distance from entry">${f.stand.map((x,i)=>x>0?`<i class="s${i}" style="flex:${x}" title="${D.stand[i]}: ${x.toFixed(0)}%"></i>`:'').join('')}</div>
+   <div class="sk">${f.stand.map((x,i)=>`<span><i class="s${i}"></i>${D.stand[i]}<b>${x.toFixed(0)}%</b></span>`).join('')}</div>
+   ${f.avg_pl==null?'':`<p class="i-s">The average holder is ${f.avg_pl>=0?'up':'down'} ${Math.abs(f.avg_pl).toFixed(0)}% on entry.</p>`}`:'';
+  return `<div class="i-h">${av(t.s)}<span><b>${esc(t.s)}</b><small>${esc(D.names[t.s]||'')}</small></span><a href="${D.gt}${D.addr[t.s]}" target="_blank" rel="noopener">Chart ↗</a></div>
+   <div class="i-k"><div><span>Holder strength</span><b>${t.score.toFixed(0)}</b></div><div><span>This week</span><b>${Math.abs(t.d)<0.5?'0':(t.d>0?'+':'−')+Math.abs(t.d).toFixed(0)}</b></div><div><span>Price, 7D</span><b>${pct(t.chg)}</b></div></div>
+   ${SOB.ascii(t.score)}
+   <p class="i-s">${esc(t.moved)}</p>
+   <div class="pt">${parts}</div>${st}
+   <div class="det-f"><button type="button" class="wbtn" data-w="${t.s}">${w?'★ On your watchlist':'☆ Watch'}</button><a class="wbtn" href="${D.links.flows}">Flows</a><a class="wbtn" href="${D.links.smart}">Smart money</a></div>`}
+ function render(){
+  $('h-h').textContent=D.read.h;$('h-p').innerHTML=D.read.p;
+  SOB.seg($('h-sort'),[['top','Firmest'],['low','Weakest'],['move','Moved most']],S.sort,v=>{S.sort=v;S.all=false;S.open=null;render()});
+  const items=[...D.tokens].sort((a,b)=>S.sort==='top'?b.score-a.score:S.sort==='low'?a.score-b.score:Math.abs(b.d)-Math.abs(a.d));
+  if(!items.find(t=>t.s===S.open))S.open=items.length&&!narrow.matches?items[0].s:null;
+  const shown=S.all?items:items.slice(0,TOP);
+  $('h-rows').innerHTML=shown.map((t,i)=>row(t,i+1)).join('')+(items.length>TOP?`<li style="border:0"><button type="button" class="all" data-all="1">${S.all?'Show top '+TOP:'Show all '+items.length}</button></li>`:'');
+  const t=D.tokens.find(t=>t.s===S.open);$('h-insp').innerHTML=t?detail(t):'<p class="empty">Pick a token to see its four parts.</p>';
+  SOB.fit(root);
+ }
+ root.addEventListener('click',e=>{
+  const w=e.target.closest('[data-w]');if(w){SOB.watch.toggle(w.dataset.w);render();return}
+  if(e.target.closest('[data-all]')){S.all=!S.all;render();return}
+  const r=e.target.closest('.row');if(r){S.open=(S.open===r.dataset.s&&narrow.matches)?null:r.dataset.s;render()}
+ });
+ narrow.addEventListener('change',render);
+ window.addEventListener('resize',()=>SOB.fit(root));
+ window.addEventListener('sob:view',e=>{if(e.detail==='holders')SOB.fit(root)});
+ render();
+})();
+</script></body></html>

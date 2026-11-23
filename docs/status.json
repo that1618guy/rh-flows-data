@@ -1,32 +1,50 @@
 {
- "built": "2026-11-23T08:51:36Z",
+ "built": "2026-11-23T09:38:39Z",
  "pages": {
-  "flows.html": {
-   "asof": "2026-11-22",
-   "tokens": 32,
-   "windows": [
-    "1d",
-    "7d"
-   ]
+  "home.html": {
+   "stamp": "Data through Nov 22",
+   "data": true,
+   "bytes": 60867
   },
-  "holders.html": {
-   "asof": "2026-11-22",
-   "tokens": 18,
-   "not_shown": [],
-   "not_scored": [
-    "INU"
-   ]
+  "flows.html": {
+   "stamp": "Data through Nov 22",
+   "data": true,
+   "bytes": 59244
   },
   "smart.html": {
-   "asof": "2026-11-22",
-   "day": "2026-11-22",
-   "wallets": 100,
-   "tokens": 32
+   "stamp": "Data through Nov 22",
+   "data": true,
+   "bytes": 47667
   },
-  "valuation.html": {
+  "holders.html": {
+   "stamp": "Data through Nov 22",
+   "data": true,
+   "bytes": 45102
+  },
+  "valuation.json": {
    "asof": "2026-11-22",
-   "projects": 12
+   "projects": 18
   }
  },
+ "logos": [
+  "AI.png",
+  "BONER.jpg",
+  "BUN.png",
+  "CASHCAT.jpg",
+  "HMM.jpg",
+  "INU.jpg",
+  "MEME.jpg",
+  "MONITOR.jpg",
+  "MOO.jpg",
+  "MOW.jpg",
+  "ORBIO.jpg",
+  "PONS.jpg",
+  "PRIORS.jpg",
+  "RAETO.jpg",
+  "SCHIFFY.jpg",
+  "STANDARD.png",
+  "TENDIES.png",
+  "UBIK.webp"
+ ],
  "failures": []
 }
