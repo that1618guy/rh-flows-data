@@ -23,8 +23,12 @@ permissions:
 
 jobs:
   fetch:
-    # a catch-up Flows run doesn't start this: the retry below starts it directly
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.display_title != 'Flows data, catch-up'
+    # From Flows finishing: skip a cancelled Flows run, and a catch-up one (the retry below starts this directly). A
+    # failed Flows run still starts it: the site data doesn't depend on the chain read. Schedules and manual runs always run.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion != 'cancelled' &&
+       github.event.workflow_run.display_title != 'Flows data, catch-up')
     runs-on: ubuntu-latest
     timeout-minutes: 75
     concurrency:
