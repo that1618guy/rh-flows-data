@@ -1,7 +1,8 @@
 name: Flows data
 
-# Reads Robinhood Chain once a day and publishes four pages to docs/ (GitHub Pages):
-# flows.html, holders.html, smart.html and valuation.html, plus status.json (pages.yml deploys docs/).
+# Reads Robinhood Chain once a day and publishes to docs/ (GitHub Pages; pages.yml deploys it): the home, Flows,
+# Smart money and Holders pages (home.html, flows.html, smart.html, holders.html), the token logos (logos/), the
+# revenue multiple's data for the Projects page (valuation.json), and status.json.
 on:
   schedule:
     - cron: "40 0 * * *"      # 00:40 UTC: the previous UTC day is complete
@@ -47,6 +48,19 @@ jobs:
             echo "::warning title=Flows::no cache-seed release, starting from yesterday"
           fi
 
+      # The stock tokens left the Flows universe (token pages are crypto only): clear their old folders from the cache.
+      # A no-op once they're gone.
+      - name: "Flows: drop tokens that left the universe"
+        run: |
+          python - <<'PY'
+          import json, os, shutil
+          keep = {t["symbol"] for t in json.load(open("data/flows_universe.json"))}
+          for d in sorted(os.listdir("data/flows_cache")):
+              p = os.path.join("data/flows_cache", d)
+              if os.path.isfile(os.path.join(p, "meta.json")) and d not in keep:
+                  shutil.rmtree(p); print("removed", d)
+          PY
+
       - name: "Flows: read the chain"
         id: read
         continue-on-error: true
@@ -55,9 +69,25 @@ jobs:
           python scripts/flows_engine.py --universe data/flows_universe.json --cache data/flows_cache
           --days 30 --max-new 3 --budget-min 20 --workers 3
 
-      - name: "Flows: build the page"
-        id: flows
-        run: python scripts/build_flows_page.py data/flows_cache data/flows_cache/page.html
+      - name: "Capital: seed empty state"
+        if: hashFiles('data/flows_cache/capital/USDG.json') == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/flows_cache/capital
+          gh release download capital-seed --pattern capital_seed.tar.gz --dir "$RUNNER_TEMP" \
+            && tar -xzf "$RUNNER_TEMP/capital_seed.tar.gz" -C data/flows_cache/capital \
+            || echo "::warning title=Capital::no capital-seed release"
+
+      - name: "Token facts and logos"
+        id: meta
+        continue-on-error: true
+        run: python scripts/token_meta.py data/flows_universe.json data/flows_cache/tokens_meta.json data/flows_cache/logos
+
+      - name: "Capital: read"
+        id: capital
+        continue-on-error: true
+        run: python scripts/capital.py data/flows_cache data/flows_cache/capital.json
 
       - name: "Holders: seed empty states"
         if: hashFiles('data/flows_cache/holders/*.state.json.gz') == ''
@@ -69,24 +99,35 @@ jobs:
             && tar -xzf "$RUNNER_TEMP/cache_seed.tar.gz" -C data/flows_cache ./holders \
             || echo "::warning title=Holders::no holder states in the cache-seed release"
 
-      - name: "Holders: roll forward and build"
-        id: holders
+      - name: "Holders: roll forward"
+        id: roll
         continue-on-error: true
-        run: |
-          for f in data/flows_cache/holders/*.state.json.gz; do python scripts/holders_state.py roll "$f" data/flows_cache; done
-          python scripts/build_holders_page.py data/flows_cache/holders data/flows_cache/holders.html data/flows_universe.json data/flows_cache
+        run: for f in data/flows_cache/holders/*.state.json.gz; do python scripts/holders_state.py roll "$f" data/flows_cache; done
 
-      - name: "Smart money: build"
+      - name: "Page: home"
+        id: home
+        continue-on-error: true
+        run: python scripts/build_home.py data/flows_cache data/flows_cache/home.html
+
+      - name: "Page: flows"
+        id: flows
+        continue-on-error: true
+        run: python scripts/build_flows_page.py data/flows_cache data/flows_cache/page.html
+
+      - name: "Page: smart money"
         id: smart
         continue-on-error: true
         run: python scripts/build_smart_page.py data/flows_cache data/flows_cache/smart.html
 
+      - name: "Page: holders"
+        id: holders
+        continue-on-error: true
+        run: python scripts/build_holders_page.py data/flows_cache data/flows_cache/holders.html
+
       - name: "Projects: revenue multiple"
         id: valuation
         continue-on-error: true
-        run: |
-          python scripts/revenue_multiple.py data/flows_cache/valuation.json
-          python scripts/build_valuation_page.py data/flows_cache/valuation.json data/flows_cache/valuation.html "$(date -u -d yesterday +%F)"
+        run: python scripts/revenue_multiple.py data/flows_cache/valuation.json
 
       - name: "Flows: save the chain cache"
         if: always()
@@ -95,43 +136,53 @@ jobs:
           path: data/flows_cache
           key: flows-${{ github.run_id }}-${{ github.run_attempt }}
 
-      # Publish whatever pages exist (a failed step leaves its last good page in place), with status.json
-      # recording each page's as-of date, what it shows and which steps failed.
+      # Publish whatever exists (a failed step leaves its last good file in place), with status.json recording each
+      # page's date, the logos and which steps failed.
       - name: Publish to docs/
         if: always()
         env:
           READ: ${{ steps.read.outcome }}
+          META: ${{ steps.meta.outcome }}
+          CAPITAL: ${{ steps.capital.outcome }}
+          ROLL: ${{ steps.roll.outcome }}
+          HOME: ${{ steps.home.outcome }}
           FLOWS: ${{ steps.flows.outcome }}
-          HOLDERS: ${{ steps.holders.outcome }}
           SMART: ${{ steps.smart.outcome }}
+          HOLDERS: ${{ steps.holders.outcome }}
           VALUATION: ${{ steps.valuation.outcome }}
         run: |
-          mkdir -p docs
-          for p in page.html:flows.html holders.html:holders.html smart.html:smart.html valuation.html:valuation.html; do
+          mkdir -p docs/logos
+          for p in home.html:home.html page.html:flows.html smart.html:smart.html holders.html:holders.html valuation.json:valuation.json; do
             src="data/flows_cache/${p%%:*}"; [ -f "$src" ] && cp "$src" "docs/${p##*:}"
           done
+          [ -d data/flows_cache/logos ] && cp -f data/flows_cache/logos/* docs/logos/ 2>/dev/null || true
+          rm -f docs/valuation.html        # the section is built by the site now, from valuation.json
           python - <<'PY'
           import datetime as dt, json, os, re
-          def data(path, data_id):
-              try:
-                  s = open(path, encoding="utf-8").read()
-              except OSError:
-                  return None, ""
-              m = re.search(rf'<script type="application/json" id="{data_id}">(.*?)</script>', s, re.S)
-              return (json.loads(m.group(1)) if m else None), s
           st = {"built": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "pages": {}}
-          f, _ = data("docs/flows.html", "flows-data")
-          st["pages"]["flows.html"] = f and {"asof": f["asof"], "tokens": len(f["tokens"]), "windows": list(f["windows"])}
-          h, _ = data("docs/holders.html", "h-data")
-          st["pages"]["holders.html"] = h and {"asof": h["asof"], "tokens": len(h["tokens"]), "not_shown": h.get("stale", []),
-                                               "not_scored": h.get("unpriced", []) + h.get("unbuildable", [])}
-          s, _ = data("docs/smart.html", "sm-data")
-          st["pages"]["smart.html"] = s and {"asof": s["asof"], "day": s["day"], "wallets": s["n_smart"], "tokens": len(s["tokens"])}
-          v, raw = data("docs/valuation.html", "val-data")
-          d = re.search(r"DefiLlama through ([A-Z][a-z]{2} \d{1,2}, \d{4})", raw)
-          st["pages"]["valuation.html"] = v and {"asof": d and dt.datetime.strptime(d.group(1), "%b %d, %Y").date().isoformat(),
-                                                 "projects": len(v["rows"])}
-          steps = {"read the chain": "READ", "flows page": "FLOWS", "holders": "HOLDERS", "smart money": "SMART", "revenue multiple": "VALUATION"}
+          for f, i in (("home.html", "home"), ("flows.html", "flows"), ("smart.html", "smart-money"), ("holders.html", "holders")):
+              try:
+                  s = open(os.path.join("docs", f), encoding="utf-8").read()
+              except OSError:
+                  st["pages"][f] = None; continue
+              m = re.search(r'<span class="stamp">([^<]*)</span>', s)
+              st["pages"][f] = {"stamp": m and m.group(1), "data": f'id="{i}-data"' in s, "bytes": len(s.encode())}
+          try:
+              v = json.load(open("docs/valuation.json"))
+              st["pages"]["valuation.json"] = {"asof": (dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=1)).isoformat()
+                                               if os.environ.get("VALUATION") == "success" else None, "projects": len(v.get("rows") or [])}
+          except (OSError, ValueError):
+              st["pages"]["valuation.json"] = None
+          old = {}
+          try:
+              old = (json.load(open("docs/status.json"))["pages"].get("valuation.json") or {})
+          except (OSError, ValueError, KeyError, AttributeError):
+              pass
+          if st["pages"]["valuation.json"] and not st["pages"]["valuation.json"]["asof"]:
+              st["pages"]["valuation.json"]["asof"] = old.get("asof")        # a failed fetch keeps the last good file and its date
+          st["logos"] = sorted(os.listdir("docs/logos"))
+          steps = {"read the chain": "READ", "token facts": "META", "capital": "CAPITAL", "holders roll": "ROLL", "home": "HOME",
+                   "flows": "FLOWS", "smart money": "SMART", "holders": "HOLDERS", "revenue multiple": "VALUATION"}
           st["failures"] = [k for k, e in steps.items() if os.environ.get(e) not in ("success", "skipped", "")]
           json.dump(st, open("docs/status.json", "w"), indent=1)
           print(json.dumps(st, indent=1))
@@ -139,7 +190,7 @@ jobs:
           touch docs/.nojekyll
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs
+          git add -A docs
           git diff --cached --quiet && exit 0
           git commit -m "Flows data $(date -u -d yesterday +%F)"
           git pull --rebase

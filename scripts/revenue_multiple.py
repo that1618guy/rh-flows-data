@@ -127,9 +127,10 @@ def build(cache=None, overrides=None):
 if __name__ == "__main__":
     out = sys.argv[1]
     cache = sys.argv[sys.argv.index("--cache") + 1] if "--cache" in sys.argv else None
-    uni = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "universe.json")
+    data = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+    uni = next((p for p in (os.path.join(data, "flows_universe.json"), os.path.join(data, "universe.json")) if os.path.exists(p)), "")
     ov = {}
-    if os.path.exists(uni):
+    if uni:
         u = {t["symbol"]: t["address"].lower() for t in json.load(open(uni))}
         if "STANDARD" in u:
             ov["The Standard Reserve"] = u["STANDARD"]

@@ -13,6 +13,10 @@ Four parts, each 0-100, on fixed scales so a score means the same thing for ever
                      that became holders 8-14 days ago still hold. -10% -> 0, flat -> 50, +10% -> 100; 0% kept -> 0, 80%+ kept -> 100
   In profit (20%)    share of holder supply whose last top-up was at or below today's price. 0% -> 0, 100% -> 100
 The same parts are worked out as of a week earlier, so each token's read says what moved.
+
+Where holders stand (facts, not part of the score): each holder's entry is the price on the day of their last
+top-up. `stand` splits holder supply into down 50%+, down less than 50%, up less than 2x, and up 2x or more against
+that entry; `avg_pl` is today's price against the supply-weighted average entry.
 """
 import datetime as dt, gzip, json
 
@@ -82,6 +86,7 @@ def parts(st, d, price):
     newbies = b8 - b14
     kept = sum(1 for a in newbies if now.get(a, 0) >= ten) / len(newbies) * 100 if newbies else None
     prof = 0
+    stand, known, cost = [0, 0, 0, 0], 0, 0.0
     for a, b in now.items():
         _bal, fi, li, _lo, daily = st["addrs"][a]
         tops = [k for k, v in daily.items() if v > 0 and k <= d]
@@ -89,7 +94,12 @@ def parts(st, d, price):
         p = price_on(st["closes"], when) if when else None
         if p and p <= price:
             prof += b
+        if p and price:
+            r = price / p
+            stand[0 if r < 0.5 else 1 if r < 1 else 2 if r < 2 else 3] += b
+            known += b; cost += b * p
     in_profit = prof / supply * 100
+    avg_pl = (price / (cost / known) - 1) * 100 if known and cost else None
     top10 = sum(sorted(now.values(), reverse=True)[:10]) / supply * 100
     sc = {"conviction": lin(conviction, 0, 80), "top": lin(top_chg, -10, 10),
           "breadth": (lin(growth, -10, 10) + (lin(kept, 0, 80) if kept is not None else 50)) / 2,
@@ -97,7 +107,9 @@ def parts(st, d, price):
     return {"score": round(sum(sc[k] * w for k, w in WEIGHTS.items()), 1), "parts": {k: round(v, 1) for k, v in sc.items()},
             "facts": {"conviction": round(conviction, 1), "top_chg": round(top_chg, 1), "holders": h_now,
                       "holders_chg": round(growth, 1), "kept": round(kept, 1) if kept is not None else None,
-                      "new": len(newbies), "in_profit": round(in_profit, 1), "top10": round(top10, 1)}}
+                      "new": len(newbies), "in_profit": round(in_profit, 1), "top10": round(top10, 1),
+                      "stand": [round(x / known * 100, 1) for x in stand] if known else None,
+                      "avg_pl": round(avg_pl, 1) if avg_pl is not None else None}}
 
 
 def priced(st):

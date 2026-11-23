@@ -15,6 +15,9 @@ or the trades' USD at the day's average price.
 Smart money: up to 100 wallets with the best total result (at least $500) that traded $5K+ with 3+ trades on 2+
 days, excluding bots (more than
 100 trades a day in a token) and contracts other than smart wallets.
+
+The book: what those wallets still hold of what they bought since the window opened, the latest day included,
+valued at the latest close. Entry is the average price they paid for it, so "up 12% on entry" is their open result.
 """
 import collections, json, os
 import flows_model as FM
@@ -41,7 +44,20 @@ def _avg(a, b):
     return sum(xs) / len(xs) if xs else None
 
 
-def build(cache_dir, n_smart=N_SMART, max_days=30):
+BOOK_MIN_USD = 50                # a position smaller than this isn't counted as holding the token
+
+
+def _qty(r, dec, pbar):
+    """Tokens bought and sold in one day row: exact where the engine stored them, estimated otherwise."""
+    b, s, nt = r[0], r[1], int(r[3])
+    if len(r) >= 6:
+        return int(r[4]) / dec, int(r[5]) / dec
+    q_net = nt / dec
+    clean = (b + s) > 0 and abs(q_net * pbar - (b - s)) <= MATCH * (b + s)
+    return (q_net if clean and s == 0 and q_net > 0 else b / pbar), (-q_net if clean and b == 0 and q_net < 0 else s / pbar)
+
+
+def build(cache_dir, n_smart=N_SMART, max_days=30, symbols=None):
     toks, codes = [], {}
     cp = os.path.join(cache_dir, "codes.json")
     if os.path.exists(cp):
@@ -50,6 +66,8 @@ def build(cache_dir, n_smart=N_SMART, max_days=30):
         tdir = os.path.join(cache_dir, sym)
         if os.path.isdir(tdir) and os.path.exists(os.path.join(tdir, "head.json.gz")):
             toks.append(FM.load_token(tdir))
+    if symbols is not None:
+        toks = [t for t in toks if t["symbol"] in symbols]
     asof = max(t["head"]["day"] for t in toks)
     toks = [t for t in toks if t["head"]["day"] == asof and (t["days"].get(asof) or {}).get("price_close")]
     # the window: latest consecutive days that most tokens have
@@ -85,13 +103,7 @@ def build(cache_dir, n_smart=N_SMART, max_days=30):
                 kind = kinds.get(a) or codes.get(a, "eoa")
                 if n > FM.BOT_TRADES_PER_DAY or kind not in W_KINDS:
                     w["bot"] = True
-                if len(r) >= 6:                  # exact token amounts per side (engine since Nov 21)
-                    qb, qs = int(r[4]) / dec, int(r[5]) / dec
-                else:
-                    q_net = nt / dec
-                    clean = (b + s) > 0 and abs(q_net * pbar - (b - s)) <= MATCH * (b + s)
-                    qb = q_net if clean and s == 0 and q_net > 0 else b / pbar
-                    qs = -q_net if clean and b == 0 and q_net < 0 else s / pbar
+                qb, qs = _qty(r, dec, pbar)
                 x = w["pos"][sym]
                 x[0] += b; x[1] += s; x[2] += qb; x[3] += qs
                 w["vol"] += b + s; w["n"] += n; w["days"].add(d)
@@ -126,6 +138,31 @@ def build(cache_dir, n_smart=N_SMART, max_days=30):
                        "category": t["category"], "token": t["token"],
                        "smart": {k: round(v, 2) for k, v in sm.items()}, "crowd": {k: round(v, 2) for k, v in cr.items()},
                        "chg": round((pc / po - 1) * 100, 2) if po and pc else None})
+    # the book: what they still hold of what they bought since the window opened, latest day included
+    crowd_net = {x["symbol"]: x["crowd"]["net"] for x in tokens}
+    for x in tokens:
+        t = next(t for t in toks if t["symbol"] == x["symbol"])
+        sym, dec = t["symbol"], 10 ** t["decimals"]
+        day = t["days"][last]
+        P = day["price_close"] or 0
+        pbar = _avg(day["price_open"], day["price_close"])
+        held = []
+        for a, w in smart:
+            b, _s, qb, qs = w["pos"].get(sym, (0.0, 0.0, 0.0, 0.0))
+            r = day["rows"].get(a)
+            if r and pbar:
+                q1, q2 = _qty(r, dec, pbar)
+                b += r[0]; qb += q1; qs += q2
+            open_q = qb - qs
+            if open_q > 0 and qb > 0 and open_q * P >= BOOK_MIN_USD:
+                held.append((a, open_q * P, b / qb, open_q))
+        usd = sum(h[1] for h in held)
+        q = sum(h[3] for h in held)
+        entry = sum(h[3] * h[2] for h in held) / q if q else None
+        held.sort(key=lambda h: -h[1])
+        x["book"] = {"wallets": len(held), "usd": round(usd, 2), "entry": entry, "price": P,
+                     "pl": round((P / entry - 1) * 100, 1) if entry else None,
+                     "top": [[a, round(u, 2), round((P / c - 1) * 100, 1) if c else None] for a, u, c, _ in held[:5]]}
     board = []
     for a, w in smart[:25]:
         best = w["tok"].most_common(1)[0] if w["tok"] else (None, 0)

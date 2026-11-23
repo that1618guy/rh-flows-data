@@ -1,381 +1,319 @@
-"""Render the Flows page content from the flows cache: who's buying and selling Robinhood Chain tokens, by wallet size.
-Only the content and its own CSS (scoped to .fl, colors from the site's tokens): build_v4.py wraps it in the site's
-shared header, content column and footer when the site is built. Self-contained otherwise: inline CSS, JS and data.
+"""The Flows page: who is buying and selling each Robinhood Chain token, and which flows stand out.
 
-Usage: build_flows_page.py <cache_dir> <out.html> [--note="..."] [--model=out.json]
+Crypto tokens only (stock tokens have their own page), and only tokens with $50K+ of pool liquidity. Net = USD
+bought less USD sold by wallets in the token's main pools; bots are shown apart. One ranked list (bought or sold),
+ten rows with the rest behind a button, and the picked token's detail beside it. A token with no net flow for the
+chosen wallet group isn't listed.
 
-Checks run before the page is written. If one fails, the existing <out.html> (the last good page) is left in place
-and the run exits 0 with GitHub Actions error annotations; with no earlier page to fall back on it exits 1.
-Warnings (data older than yesterday, tokens left out) are printed as annotations and don't block the page."""
-import datetime as dt, json, math, sys, os, html
+Usage: build_flows_page.py <cache_dir> <out.html>
+       cache_dir is data/flows_cache (token day files, tokens_meta.json). `views()` gives the parts for a bundle.
+"""
+import html, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import flows_model as FM
+import inflow as IN
+import site_shell as SH
+import token_meta as TM
+from site_shell import fm, signed, pct, dshort
 
-NOTE = "The list is reviewed by hand. HOOD is left out: it copies the stock ticker but isn't a stock token."
-MIN_TOKENS = 20          # fewer tokens than this on a run means something broke: keep the last good page
-
-
-def fm(x):
-    a = abs(x)
-    s = f"${a/1e9:.2f}B" if a >= 1e9 else f"${a/1e6:.1f}M" if a >= 1e6 else f"${a/1e3:.0f}K" if a >= 1e4 else f"${a/1e3:.1f}K" if a >= 1e3 else f"${a:,.0f}"
-    return s
-
-
-def signed(x):
-    return ("+" if x >= 0 else "−") + fm(x)
-
-
-def phrase(model, wid):
-    d = FM.dshort(model["asof"])
-    return f"on {d}" if wid == "1d" else f"in the {wid[:-1]} days to {d}"
-
-
-def window_label(model, wid):
-    w = model["windows"][wid]
-    return FM.dshort(w["to"]) if wid == "1d" else f"{FM.dshort(w['from'])} to {FM.dshort(w['to'])}"
+MIN_TOKENS = 8                 # fewer than this on a run means something broke: keep the last good page
+EVEN = 0.05                    # net within this % of the tokens' combined market cap reads as even
+# What makes a flow stand out. Sizes are a share of the token's market cap, so small tokens are judged fairly.
+SPLIT_MIN = 0.05               # whales' net, % of market cap, to flag whales going against the crowd
+SPLIT_USD = 10_000             # and in dollars, so a $5K whale trade in a tiny token doesn't count
+SPLIT_OPP = 0.25               # the crowd must take at least this share of the other side
+DIVERGE_NET = 0.10             # net flow, % of market cap, to flag a flow going against the price
+DIVERGE_PX = 5.0               # price move, %, in the opposite direction
+STREAK = 4                     # days in a row
+FRESH_N, FRESH_SHARE = 15, 0.5  # new wallets, and their share of the net buying
+GROUPS = ["whale", "big", "mid", "small"]
+GLABEL = {"all": "All wallets", "whale": "Whales", "big": "Big", "mid": "Mid", "small": "Small"}
+GLONG = {"whale": "Whales", "big": "Big wallets", "mid": "Mid wallets", "small": "Small wallets"}
 
 
-def read(model, wid):
-    """Two to three plain sentences on the window, every number from the model."""
-    T = model["tokens"]; N = len(T)
-    g = {gid: sum(t["w"][wid][gid]["net"] for t in T) for gid in ("whale", "big", "mid", "small")}
-    total = sum(g.values())
-    lab = {x["id"]: x["label"] for x in model["groups"]}
-    verb = "bought" if total >= 0 else "sold"
-    s1 = f"Wallets net {verb} {fm(total)} of the {N} Robinhood Chain token{'s' if N != 1 else ''} we track {phrase(model, wid)}."
-    sign = 1 if total >= 0 else -1
-    lead = max(g, key=lambda k: sign * g[k])
-    opp = max(g, key=lambda k: -sign * g[k])
-    s2 = f" {lab[lead]} led the {'buying' if total >= 0 else 'selling'} ({signed(g[lead])})"
-    if -sign * g[opp] > max(25_000, 0.15 * abs(total)):
-        s2 += f", while {lab[opp].lower()} {'bought' if g[opp] > 0 else 'sold'} {fm(g[opp])}"
-    s2 += "."
-    cats = {c["id"]: [t for t in T if t["category"] == c["id"]] for c in model["cats"]}
-    cnet = {c: sum(t["w"][wid]["all"]["net"] for t in ts) for c, ts in cats.items() if ts}
-    labc = {c["id"]: c["label"] for c in model["cats"]}
-    s3 = ""
-    against = [c for c in cnet if (cnet[c] > 0) != (total > 0) and abs(cnet[c]) > 10_000]
-    if against:
-        c = max(against, key=lambda c: abs(cnet[c]))
-        top = max(cats[c], key=lambda t: -sign * t["w"][wid]["all"]["net"])
-        s3 = (f" {labc[c]} went the other way ({signed(cnet[c])}), led by {top['symbol']} "
-              f"({signed(top['w'][wid]['all']['net'])}).")
-    else:
-        top = max(T, key=lambda t: sign * t["w"][wid]["all"]["net"])
-        s3 = f" {top['symbol']} saw the most {'buying' if total >= 0 else 'selling'} ({signed(top['w'][wid]['all']['net'])})."
-    return s1 + s2 + s3
+def daily_net(tdir):
+    """[[day, wallets' net USD]] for every cached day, bots left out by the same rule the model uses."""
+    t = FM.load_token(tdir)
+    kinds = t["head"]["kinds"]
+    out = []
+    for d in sorted(t["days"]):
+        net = 0.0
+        for a, row in t["days"][d]["rows"].items():
+            n = row[2]
+            if n > FM.BOT_TRADES_PER_DAY or (kinds.get(a, "eoa") not in FM.WALLET_KINDS and n >= 10):
+                continue
+            net += row[0] - row[1]
+        out.append([d, round(net)])
+    return out
 
 
-def stock_read(model, wid):
-    """Supply change, then who traded the stock in the pools: wallets vs bots."""
-    S = [t for t in model["tokens"] if t["category"] == "stocks"]
-    if not S:
-        return ""
-    minted = sum(t["w"][wid]["minted"] for t in S)
-    dex = sum(t["w"][wid]["all"]["net"] for t in S)
-    bots = sum(t["w"][wid]["bots"]["net"] for t in S)
-    a = f"Stock tokens' supply on the chain {'grew' if minted >= 0 else 'shrank'} by {fm(minted)} {phrase(model, wid)}."
-    b = (f" In the pools, wallets net {'bought' if dex >= 0 else 'sold'} {fm(dex)}, while bots, mostly arbitrage desks, "
-         f"net {'bought' if bots >= 0 else 'sold'} {fm(bots)}.")
-    return a + b
+def streak(daily):
+    """Days in a row, ending on the latest day, with net buying (+n) or net selling (-n)."""
+    n = 0
+    for _, v in reversed(daily):
+        s = 1 if v > 1 else -1 if v < -1 else 0
+        if s == 0 or (n and (s > 0) != (n > 0)):
+            break
+        n += s
+    return n
 
 
-def windows_note(model):
-    have = model["windows"]
-    s = "1D is the latest full UTC day" + (", 7D the latest seven" if "7d" in have else "") + \
-        (", 30D the latest thirty" if "30d" in have else "") + "."
-    later = [w for w in ("7d", "30d") if w not in have]
-    if later:
-        s += (f" {' and '.join(w.upper() for w in later)} {'appear' if len(later) > 1 else 'appears'} once "
-              f"{' and '.join(w[:-1] for w in later)} days are recorded.")
-    return s
+def tags(w, size, run):
+    """Short labels for what stands out in one token's window, strongest first: [(id, label, sentence)]."""
+    out = []
+    net = w["all"]["net"]; wh = w["whale"]["net"]; crowd = w["mid"]["net"] + w["small"]["net"]
+    if size:
+        if abs(wh) / size * 100 >= SPLIT_MIN and abs(wh) >= SPLIT_USD and wh * crowd < 0 and abs(crowd) >= SPLIT_OPP * abs(wh):
+            if wh > 0:
+                out.append(("split", "Whales buying, crowd selling", f"Whales bought {fm(wh)} while smaller wallets sold {fm(crowd)}."))
+            else:
+                out.append(("split", "Whales selling, crowd buying", f"Whales sold {fm(wh)} while smaller wallets bought {fm(crowd)}."))
+        chg = w.get("price_chg")
+        if chg is not None and abs(net) / size * 100 >= DIVERGE_NET:
+            if net > 0 and chg <= -DIVERGE_PX:
+                out.append(("weak", "Bought on weakness", f"Wallets bought {fm(net)} while the price fell {abs(chg):.0f}%."))
+            elif net < 0 and chg >= DIVERGE_PX:
+                out.append(("strong", "Sold into strength", f"Wallets sold {fm(net)} while the price rose {chg:.0f}%."))
+    fr = w["all"]
+    if fr["fresh_n"] >= FRESH_N and net > 0 and fr["fresh_net"] >= FRESH_SHARE * net:
+        out.append(("fresh", "New wallets leading", f"{fr['fresh_n']:,} new wallets bought {fm(fr['fresh_net'])} and still hold it."))
+    if abs(run) >= STREAK:
+        out.append(("run", f"{'Bought' if run > 0 else 'Sold'} {abs(run)} days running", f"Wallets have net {'bought' if run > 0 else 'sold'} it {abs(run)} days in a row."))
+    return out
 
 
-def not_shown(model):
-    parts = []
-    if model.get("unpriced"):
-        parts.append(f"{', '.join(model['unpriced'])} (no price data)")
-    if model.get("stale"):
-        parts.append(f"{', '.join(model['stale'])} (didn't update this run)")
-    if model.get("incomplete"):
-        parts.append(f"{', '.join(model['incomplete'])} (history still filling in)")
-    return f" Not shown today: {'; '.join(parts)}." if parts else ""
+RANK = {"split": 3, "weak": 3, "strong": 3, "fresh": 2, "run": 1}      # what leads "Worth a look"
 
 
-def check(model):
-    """Hard problems (errs) keep the last good page up; warnings are reported but the page still updates."""
-    errs, warns = [], []
-    T = model["tokens"]
-    if len(T) < MIN_TOKENS:
-        errs.append(f"only {len(T)} tokens made it through (need {MIN_TOKENS}+)")
-    if "1d" not in model["windows"]:
-        errs.append("no 1D window")
-    groups = ("whale", "big", "mid", "small")
+def read(T, wid, win, sizes):
+    """Headline and at most three sentences for one window."""
+    N = len(T)
+    g = {k: sum(t["w"][wid][k]["net"] for t in T) for k in GROUPS}
+    tot = sum(g.values())
+    total_size = sum(sizes.values()) or 1
+    share = tot / total_size * 100
+    h = ("Wallets are buying RH tokens." if share > EVEN else "Wallets are selling RH tokens." if share < -EVEN
+         else "Buying and selling are close to even.")
+    when = f"on {dshort(win['to'])}" if wid == "1d" else f"in the 7 days to {dshort(win['to'])}" if wid == "7d" else f"in the 30 days to {dshort(win['to'])}"
+    p = f"Wallets net {'bought' if tot >= 0 else 'sold'} <b>{fm(tot)}</b> across {N} tokens {when}."
+    sign = 1 if tot >= 0 else -1
+    lead = max(g, key=lambda k: sign * g[k]); opp = max(g, key=lambda k: -sign * g[k])
+    if abs(g[lead]) > 1000:
+        p += f" {GLONG[lead]} led the {'buying' if tot >= 0 else 'selling'} ({signed(g[lead])})"
+        if -sign * g[opp] > max(10_000, 0.15 * abs(tot)):
+            p += f", while {GLONG[opp].lower()} {'bought' if g[opp] > 0 else 'sold'} {fm(g[opp])}"
+        p += "."
+    up = sum(1 for t in T if t["w"][wid]["all"]["net"] > 1)
+    p += f" {up} of {N} tokens were net bought."
+    return {"h": h, "p": p}
+
+
+def model(cache_dir):
+    flows = FM.build(cache_dir)
+    meta = json.load(open(os.path.join(cache_dir, "tokens_meta.json")))
+    T = [t for t in flows["tokens"] if t["category"] != "stocks" and (meta.get(t["symbol"]) or {}).get("liq", 0) >= IN.MIN_LIQ]
+    sizes = {t["symbol"]: TM.size(meta[t["symbol"]]) for t in T}
+    wins = {}
+    for wid, w in flows["windows"].items():
+        wins[wid] = {"from": w["from"], "to": w["to"],
+                     "label": dshort(w["to"]) if wid == "1d" else f"{dshort(w['from'])} to {dshort(w['to'])}"}
+    toks, look = [], {wid: [] for wid in wins}
     for t in T:
-        if not t.get("price"):
-            errs.append(f"{t['symbol']}: no price")
-        for w in model["windows"]:
-            r = t["w"].get(w)
-            if not r:
-                errs.append(f"{t['symbol']}: no {w} numbers"); continue
-            vals = [r[g][k] for g in groups + ("bots", "all") for k in ("net", "bought", "sold")] + [r["minted"]]
-            if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in vals):
-                errs.append(f"{t['symbol']} {w}: a number isn't finite")
-            elif abs(sum(r[g]["net"] for g in groups) - r["all"]["net"]) > 1:
-                errs.append(f"{t['symbol']} {w}: size groups don't add up to all wallets")
-    for w in model["windows"]:
-        if T and not sum(t["w"][w]["all"]["bought"] + t["w"][w]["all"]["sold"] for t in T if w in t["w"]):
-            errs.append(f"{w}: no volume at all")
-        if not (model.get("reads") or {}).get(w):
-            errs.append(f"{w}: empty read")
-    yday = (dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=1)).isoformat()
-    if model["asof"] < yday:
-        warns.append(f"data is through {model['asof']}, not {yday}: the chain read didn't finish this run")
-    if model.get("stale"):
-        warns.append(f"didn't update this run, left out: {', '.join(model['stale'])}")
-    if model.get("incomplete"):
-        warns.append(f"history still filling in, left out: {', '.join(model['incomplete'])}")
-    if model.get("unpriced"):
-        warns.append(f"no price data, left out: {', '.join(model['unpriced'])}")
-    return errs[:12], warns
+        s = t["symbol"]; size = sizes[s]
+        daily = daily_net(os.path.join(cache_dir, s))[-30:]
+        run = streak(daily)
+        rec = {"s": s, "size": round(size), "daily": daily, "run": run, "w": {}}
+        for wid in wins:
+            w = t["w"][wid]
+            tg = tags(w, size, run)
+            rec["w"][wid] = {"net": {k: round(w[k]["net"]) for k in ["all"] + GROUPS},
+                             "buyers": w["all"]["buyers"], "sellers": w["all"]["sellers"],
+                             "fresh_n": w["all"]["fresh_n"], "fresh_net": round(w["all"]["fresh_net"]),
+                             "bots": round(w["bots"]["net"]), "chg": w["price_chg"], "tags": [[i, l, x] for i, l, x in tg]}
+            if tg and size:
+                usd = abs(w["whale"]["net"]) if tg[0][0] == "split" else abs(w["all"]["net"])
+                look[wid].append((RANK[tg[0][0]], usd, s, tg[0][1], tg[0][2]))
+        toks.append(rec)
+    cohorts = {}
+    for wid in wins:
+        c = {}
+        for k in GROUPS:
+            c[k] = {"net": round(sum(t["w"][wid][k]["net"] for t in T)),
+                    "up": sum(1 for t in T if t["w"][wid][k]["net"] > 1), "down": sum(1 for t in T if t["w"][wid][k]["net"] < -1)}
+        c["fresh"] = {"n": sum(t["w"][wid]["all"]["fresh_n"] for t in T), "net": round(sum(t["w"][wid]["all"]["fresh_net"] for t in T))}
+        c["bots"] = {"n": sum(t["w"][wid]["bots"]["wallets"] for t in T), "net": round(sum(t["w"][wid]["bots"]["net"] for t in T))}
+        cohorts[wid] = c
+    return {"asof": flows["asof"], "windows": wins, "tokens": toks, "cohorts": cohorts, "meta": meta,
+            "read": {wid: read(T, wid, flows["windows"][wid], sizes) for wid in wins},
+            "look": {wid: [{"s": s, "label": l, "text": x} for _, _, s, l, x in sorted(v, reverse=True)[:3]] for wid, v in look.items()},
+            "left_out": sorted(t["symbol"] for t in flows["tokens"] if t["category"] != "stocks" and t not in T),
+            "stale": flows["stale"], "unpriced": [x for x in flows["unpriced"] if x in meta], "incomplete": flows["incomplete"]}
+
+
+def view(m, href=lambda i: f"/{i}"):
+    data = {k: m[k] for k in ("asof", "windows", "tokens", "cohorts", "read", "look")}
+    data["groups"] = [[k, GLABEL[k]] for k in ["all"] + GROUPS]
+    data["ranges"] = FM.GROUP_RANGE
+    data["glong"] = GLONG
+    data["gt"] = "https://www.geckoterminal.com/robinhood/tokens/"
+    data["addr"] = {s: x["address"] for s, x in m["meta"].items()}
+    data["names"] = {s: x["name"] for s, x in m["meta"].items()}
+    data["links"] = {"smart": href("smart-money"), "holders": href("holders")}
+    left = f" Left out for thin liquidity: {', '.join(m['left_out'])}." if m["left_out"] else ""
+    if m["unpriced"]:
+        left += f" No recent price: {', '.join(m['unpriced'])}."
+    body = f"""
+<section class="pg-head">
+<p class="eyebrow">Flows · <span id="f-when"></span></p>
+<h1 id="f-h"></h1>
+<p class="lede" id="f-p"></p>
+<div class="ctl pg-ctl"><div class="seg" id="f-win" role="group" aria-label="Window"></div><div class="seg" id="f-grp" role="group" aria-label="Wallet size"></div><button type="button" class="chip" id="f-watch" hidden></button></div>
+</section>
+
+<section class="sec" id="f-look-sec">
+<div class="sec-h"><div><h2>Worth a look</h2><p>Flows that go against the price or against the crowd.</p></div></div>
+<div class="look" id="f-look"></div>
+</section>
+
+<section class="sec">
+<div class="md">
+<div class="md-list"><div class="sec-h"><div class="seg" id="f-side" role="group" aria-label="Bought or sold"></div><p class="md-sum" id="f-sum"></p></div>
+<div class="panel"><ol class="rank" id="f-rows"></ol></div></div>
+<aside class="panel insp" id="f-insp" aria-live="polite"></aside>
+</div>
+</section>
+
+<section class="sec">
+<div class="sec-h"><div><h2>Who is behind it</h2><p>The same flows by wallet size, added across every token.</p></div></div>
+<div class="coh4" id="f-coh"></div>
+<p class="note" id="f-apart" style="margin-top:14px"></p>
+</section>
+
+<details class="how"><summary>How this is measured</summary><dl>
+<dt>Net flow</dt><dd>USD bought less USD sold by wallets in each token's main pools, read swap by swap from Robinhood Chain and priced with GeckoTerminal. The share of market cap beside it lets you compare a small token with a large one.</dd>
+<dt>Wallet size</dt><dd>By what a wallet held of that token at the start or end of the window, whichever is larger: whales $50K+, big $5K to $50K, mid $500 to $5K, small under $500.</dd>
+<dt>New wallets</dt><dd>Held none at the start, net bought, and still hold at least half of it.</dd>
+<dt>Bots</dt><dd>Addresses trading more than 100 times a day, and contracts trading 10+ times a day. Counted apart, never inside a wallet group.</dd>
+<dt>Worth a look</dt><dd>Whales against the crowd: whales' net is at least {SPLIT_MIN}% of market cap and $10K, and smaller wallets took a quarter or more of the other side. Bought on weakness, sold into strength: net flow of {DIVERGE_NET:.1f}%+ of market cap against a {DIVERGE_PX:.0f}%+ price move. Days running: {STREAK}+ days in a row. New wallets leading: {FRESH_N}+ new wallets did half or more of the net buying.</dd>
+<dt>Included</dt><dd>Crypto tokens on Robinhood Chain with $50K+ of pool liquidity.{left} Stock tokens have their own page.</dd>
+</dl></details>
+"""
+    return {"id": "flows", "title": "Flows", "desc": "Who is buying and selling each Robinhood Chain token.",
+            "body": body, "css": CSS, "js": JS, "data": data}
 
 
 CSS = r"""
-.fl{--card:var(--panel);--card2:color-mix(in srgb,var(--panel),var(--text) 5%);--line2:color-mix(in srgb,var(--line),var(--text) 8%);
---ink:var(--text);--faint:var(--soft2);--neg:var(--off);--warn:var(--mid);--mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
-line-height:1.5;padding-top:40px}
-.fl .over{font:500 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--soft)}
-.fl h1{font-size:46px;line-height:1.05;letter-spacing:-.035em;margin:14px 0 18px;font-weight:700}
-.fl .read{font-size:18px;line-height:1.6;max-width:760px;margin:0}
-.fl .meta{font-size:13px;color:var(--faint);margin-top:14px}
-.fl .ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:34px 0 18px}
-.fl .seg{display:inline-flex;border:1px solid var(--line2);border-radius:999px;padding:3px;gap:2px;background:var(--card);max-width:100%;overflow-x:auto;scrollbar-width:none}
-.fl .seg::-webkit-scrollbar{display:none}
-.fl .seg button{all:unset;cursor:pointer;padding:6px 13px;border-radius:999px;font-size:13.5px;color:var(--soft);white-space:nowrap}
-.fl .seg button:hover{color:var(--ink)}.fl .seg button.on{background:var(--lime);color:var(--on-lime);font-weight:600}
-.fl .seg.sm button{padding:5px 11px;font-size:13px}
-.fl .count{margin-left:auto;font:12px var(--mono);color:var(--faint)}
-.fl .grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px}
-.fl .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
-.fl .card h2{font-size:19px;letter-spacing:-.02em;margin:0;font-weight:650}
-.fl .card .sub{font-size:13px;color:var(--soft);margin:6px 0 0;line-height:1.5}
-.fl .ch{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.fl .rank{margin-top:16px}
-.fl .rrow{display:grid;grid-template-columns:22px minmax(0,150px) minmax(0,1fr) 92px;gap:12px;align-items:center;padding:7px 8px;border-radius:9px;cursor:pointer}
-.fl .rrow:hover{background:var(--card2)}.fl .rrow.sel{background:var(--card2);box-shadow:inset 0 0 0 1px var(--line2)}
-.fl .rrow .n{font:12px var(--mono);color:var(--faint);text-align:right}
-.fl .tk b{font-weight:650;font-size:14px}.fl .tk small{display:block;color:var(--faint);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fl .bar{position:relative;height:16px}
-.fl .bar:before{content:"";position:absolute;left:50%;top:-4px;bottom:-4px;border-left:1px solid var(--line2)}
-.fl .bar span{position:absolute;top:2px;height:12px;border-radius:3px}
-.fl .bar .p{left:50%;background:var(--lime-ink)}.fl .bar .m{right:50%;background:var(--neg)}
-.fl .val{text-align:right;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600}
-.fl .val.p{color:var(--lime-ink)}.fl .val.m{color:var(--neg)}
-.fl .more{all:unset;cursor:pointer;margin-top:12px;border:1px solid var(--line2);border-radius:10px;padding:8px 14px;font-size:13.5px}
-.fl .more:hover{border-color:var(--soft)}
-.fl .chip{border:1px solid var(--line2);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--soft);display:inline-flex;align-items:center;gap:7px}
-.fl .pt{font:600 9.5px var(--mono);font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);border-radius:5px;padding:1px 5px;margin-left:7px;vertical-align:2px}
-.fl .flag{font-size:13px;line-height:1.5;color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);border:1px solid color-mix(in srgb,var(--warn) 25%,transparent);border-radius:10px;padding:10px 12px;margin:12px 0 0}
-.fl .lead{font:11px var(--mono);color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
-.fl table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-.fl th{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:right;padding:0 0 10px;font-weight:500}
-.fl th:not(:first-child){padding-left:10px}
-.fl #stbl th{padding-left:14px;white-space:nowrap}
-.fl th:first-child,.fl td:first-child{text-align:left}
-.fl td{padding:11px 0;border-top:1px solid var(--line);text-align:right;font-size:14px}
-.fl td:not(:first-child){white-space:nowrap;padding-left:10px}
-.fl td .rg{display:block;color:var(--faint);font-size:12px;margin-top:2px;font-weight:400}
-.fl .more[hidden]{display:none}
-.fl tr.tot td{font-weight:650}
-.fl #stbl td .rg{display:inline;margin-left:6px}
-.fl tr.apart td{color:var(--soft)}
-.fl td.p{color:var(--lime-ink)}.fl td.m{color:var(--neg)}
-.fl .note{font-size:12.5px;color:var(--faint);line-height:1.55;margin:14px 0 0}
-.fl .tdet{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
-.fl .tdet .hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.fl .tdet .hd b{font-size:17px}.fl .tdet .hd span{color:var(--soft);font-size:13px}
-.fl .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 6px}
-.fl .kpi{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.fl .kpi b{display:block;font-size:19px;letter-spacing:-.02em}.fl .kpi span{font-size:12px;color:var(--soft)}
-.fl .mini{display:grid;grid-template-columns:minmax(0,1fr) 120px 74px 62px 62px;gap:8px;align-items:center;font-size:13.5px;padding:8px 0;border-top:1px solid var(--line)}
-.fl .mini.h{border-top:0;font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding-top:0}
-.fl .mini>:not(:first-child){text-align:right}.fl .mini .bar{height:12px}.fl .mini .bar span{height:8px}
-.fl .sec{margin-top:48px}
-.fl .sec>.ch h2{font-size:26px;letter-spacing:-.03em;margin:0}
-.fl .sec>.ch p{color:var(--soft);margin:8px 0 0;max-width:120ch;font-size:15px}
-.fl .sread{font-size:16px;line-height:1.6;margin:16px 0 18px;max-width:900px}
-.fl details.how{margin-top:48px;border-top:1px solid var(--line);padding-top:18px}
-.fl details.how summary{cursor:pointer;font-weight:600;font-size:16px;list-style:none}
-.fl details.how summary:after{content:" +";color:var(--soft)}.fl details.how[open] summary:after{content:" \2212"}
-.fl details.how dl{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px 24px;margin:18px 0 0;font-size:14px;line-height:1.6}
-.fl details.how dt{font-weight:600}.fl details.how dd{margin:0;color:var(--soft)}
-.fl .fsrc{margin-top:28px;font-size:12.5px;color:var(--faint);line-height:1.6}
-.fl .beta{font:600 10.5px var(--mono);letter-spacing:.12em;color:var(--lime-ink);border:1px solid color-mix(in srgb,var(--lime-ink) 35%,transparent);border-radius:6px;padding:3px 7px;margin-left:10px;vertical-align:middle}
-@media (max-width:980px){.fl .grid{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:620px){.fl{padding-top:28px}.fl h1{font-size:34px}.fl .read{font-size:16.5px}
-.fl .rrow{grid-template-columns:18px minmax(0,96px) minmax(0,1fr) 74px;gap:8px;padding:7px 4px}.fl .val{font-size:13px}
-.fl .card{padding:18px 16px}.fl .kpis{grid-template-columns:1fr 1fr}.fl .mini{grid-template-columns:minmax(0,1fr) 70px 54px 44px 44px;font-size:12.5px}
-.fl .count{margin-left:0;width:100%}.fl #across th:nth-child(2),.fl #across td:nth-child(2){display:none}.fl td:not(:first-child){padding-left:6px}.fl details.how dl{grid-template-columns:1fr}}
+.dly svg{display:block;width:100%;height:48px;margin-top:10px}
+.coh4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.ch{padding:20px 20px 18px;border-left:1px solid var(--line);min-width:0}
+.ch:first-child{border-left:0;padding-left:0}
+.ch-l{font-size:14.5px;font-weight:500}
+.ch-l small{color:var(--ink-3);font-weight:400;margin-left:6px;font-size:12.5px}
+.ch-v{margin:8px 0 12px;font-size:26px;font-weight:620;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.ch small.c{display:block;margin-top:10px;color:var(--ink-3);font-size:12.5px}
+@media (max-width:860px){
+  .coh4{grid-template-columns:1fr 1fr}
+  .ch{padding:16px 14px}
+  .ch:nth-child(odd){border-left:0;padding-left:0}
+  .ch:nth-child(n+3){border-top:1px solid var(--line)}
+}
 """
 
 JS = r"""
-const M=JSON.parse(document.getElementById('flows-data').textContent);
-const S={w:('7d' in M.windows)?'7d':'1d',c:'all',g:'all',dir:'buy',sel:null,all:false};
-const fm=x=>{const a=Math.abs(x);return a>=1e9?'$'+(a/1e9).toFixed(2)+'B':a>=1e6?'$'+(a/1e6).toFixed(1)+'M':a>=1e4?'$'+Math.round(a/1e3)+'K':a>=1e3?'$'+(a/1e3).toFixed(1)+'K':'$'+Math.round(a).toLocaleString()};
-const sg=x=>Math.abs(x)<0.5?'$0':(x>=0?'+':'−')+fm(x);
-const cls=x=>x>=0?'p':'m';
-const GL=Object.fromEntries(M.groups.map(g=>[g.id,g.label]));
-const toks=()=>M.tokens.filter(t=>S.c==='all'||t.category===S.c);
-function bar(v,max){const w=max?Math.min(50,Math.abs(v)/max*50):0;return `<div class="bar"><span class="${v>=0?'p':'m'}" style="width:${w.toFixed(2)}%"></span></div>`}
-function seg(el,key,opts){el.innerHTML=opts.map(([v,l])=>`<button data-v="${v}" class="${S[key]===v?'on':''}">${l}</button>`).join('');
- el.onclick=e=>{const b=e.target.closest('button');if(!b)return;S[key]=b.dataset.v;if(key==='c'){S.sel=null;S.all=false}render()}}
-function render(){
- seg(document.getElementById('s-w'),'w',['1d','7d','30d'].filter(w=>w in M.windows).map(w=>[w,w.toUpperCase()]));
- seg(document.getElementById('s-c'),'c',[['all','All'],...M.cats.filter(c=>M.tokens.some(t=>t.category===c.id)).map(c=>[c.id,c.label])]);
- seg(document.getElementById('s-g'),'g',[['all','All wallets'],...M.groups.map(g=>[g.id,g.label.replace(' wallets','')])]);
- seg(document.getElementById('s-d'),'dir',[['buy','Buying'],['sell','Selling']]);
- document.getElementById('read').textContent=M.reads[S.w];
- const T=toks();document.getElementById('count').textContent=T.length+' of '+M.tokens.length+' tokens';
- const wl=M.labels[S.w];
- // ranking
- const rows=T.map(t=>({t,v:t.w[S.w][S.g].net})).sort((a,b)=>S.dir==='buy'?b.v-a.v:a.v-b.v);
- const max=Math.max(1,...rows.map(r=>Math.abs(r.v)));
- const show=S.all?rows:rows.slice(0,12);
- if(!S.sel||!T.includes(S.sel))S.sel=rows[0]&&rows[0].t;
- document.getElementById('rk-h').textContent=(S.g==='all'?'All wallets':GL[S.g])+', '+(S.dir==='buy'?'buying most':'selling most');
- document.getElementById('rk-sub').textContent=`USD bought less USD sold by ${S.g==='all'?'every wallet we count':GL[S.g].toLowerCase()+' ('+M.groups.find(g=>g.id===S.g).range+')'} in each token's main pools, ${wl}.`;
- document.getElementById('rank').innerHTML=show.map((r,i)=>{const w=r.t.w[S.w];const ld=S.g==='all'&&w.lead?GL[w.lead].replace(' wallets',''):'';
-  return `<div class="rrow ${r.t===S.sel?'sel':''}" data-s="${r.t.symbol}"><span class="n">${i+1}</span><span class="tk"><b>${r.t.symbol}</b>${(r.t.w[S.w].passthrough||0)>=60?'<i class="pt" title="Mostly pass-through volume">pass-through</i>':''}<small>${ld?'Led by '+ld.toLowerCase():r.t.name}</small></span>${bar(r.v,max)}<span class="val ${cls(r.v)}">${sg(r.v)}</span></div>`}).join('');
- document.getElementById('rank').onclick=e=>{const r=e.target.closest('.rrow');if(!r)return;S.sel=M.tokens.find(t=>t.symbol===r.dataset.s);render()};
- const mb=document.getElementById('more');mb.hidden=rows.length<=12;mb.textContent=S.all?'Show top 12':'Show all '+rows.length;mb.onclick=()=>{S.all=!S.all;render()};
- // across
- const gids=['whale','big','mid','small'];
- const acc=gids.map(g=>({g,net:T.reduce((s,t)=>s+t.w[S.w][g].net,0),up:T.filter(t=>t.w[S.w][g].net>1).length,dn:T.filter(t=>t.w[S.w][g].net<-1).length}));
- const tot={net:acc.reduce((s,a)=>s+a.net,0),up:T.filter(t=>t.w[S.w].all.net>1).length,dn:T.filter(t=>t.w[S.w].all.net<-1).length};
- const fresh={net:T.reduce((s,t)=>s+t.w[S.w].all.fresh_net,0),n:T.reduce((s,t)=>s+t.w[S.w].all.fresh_n,0)};
- const bots={net:T.reduce((s,t)=>s+t.w[S.w].bots.net,0),n:T.reduce((s,t)=>s+t.w[S.w].bots.wallets,0)};
- const amax=Math.max(1,...acc.map(a=>Math.abs(a.net)),Math.abs(tot.net));
- document.getElementById('acc-sub').textContent=`${T.length} tokens, ${wl}. Bought more and sold more count tokens.`;
- document.getElementById('across').innerHTML=`<tr><th>Wallets</th><th style="width:24%"></th><th>Net</th><th>Bought more</th><th>Sold more</th></tr>`+
-  `<tr class="tot"><td>All wallets</td><td>${bar(tot.net,amax)}</td><td class="${cls(tot.net)}">${sg(tot.net)}</td><td>${tot.up}</td><td>${tot.dn}</td></tr>`+
-  acc.map(a=>{const g=M.groups.find(x=>x.id===a.g);return `<tr><td>${g.label}<span class="rg">${g.range}</span></td><td>${bar(a.net,amax)}</td><td class="${cls(a.net)}">${sg(a.net)}</td><td>${a.up}</td><td>${a.dn}</td></tr>`}).join('')+
-  `<tr class="apart"><td>Fresh wallets<span class="rg">held none at the start</span></td><td></td><td class="${cls(fresh.net)}">${sg(fresh.net)}</td><td colspan="2">${fresh.n.toLocaleString()} wallets</td></tr>`+
-  `<tr class="apart"><td>Bots and contracts<span class="rg">shown apart</span></td><td></td><td>${sg(bots.net)}</td><td colspan="2">${bots.n.toLocaleString()} addresses</td></tr>`;
- // token detail
- const t=S.sel;if(!t){document.getElementById('tdet').innerHTML='';return}
- const w=t.w[S.w];const dmax=Math.max(1,...gids.map(g=>Math.abs(w[g].net)),Math.abs(w.bots.net));
- const pc=w.price_chg==null?'':(w.price_chg>=0?'+':'−')+Math.abs(w.price_chg).toFixed(1)+'%';
- document.getElementById('tdet').innerHTML=`<div class="hd"><b>${t.symbol}</b><span>${t.name} · ${({memes:'Meme',stocks:'Stock token',agents:'AI & agents',ecosystem:'Ecosystem'})[t.category]}</span>
-  <a class="chip" style="margin-left:auto" href="https://www.geckoterminal.com/robinhood/tokens/${t.token}" target="_blank" rel="noopener">Chart ↗</a></div>
-  <div class="kpis"><div class="kpi"><b class="${'val '+cls(w.all.net)}" style="text-align:left">${sg(w.all.net)}</b><span>Net, all wallets</span></div>
-  <div class="kpi"><b>${w.all.wallets.toLocaleString()}</b><span>Wallets traded</span></div>
-  <div class="kpi"><b>${pc||'—'}</b><span>Price, ${S.w==='1d'?'day':parseInt(S.w)+' days'}</span></div></div>
-  <div class="mini h"><span>Wallets</span><span></span><span>Net</span><span>Buyers</span><span>Sellers</span></div>`+
-  gids.map(g=>`<div class="mini"><span>${GL[g]}</span>${bar(w[g].net,dmax)}<span class="${'val '+cls(w[g].net)}">${sg(w[g].net)}</span><span>${w[g].buyers}</span><span>${w[g].sellers}</span></div>`).join('')+
-  `<div class="mini"><span style="color:var(--soft)">Fresh wallets</span><span></span><span class="${'val '+cls(w.all.fresh_net)}">${sg(w.all.fresh_net)}</span><span>${w.all.fresh_n}</span><span>—</span></div>`+
-  `<div class="mini"><span style="color:var(--soft)">Bots and contracts</span>${bar(w.bots.net,dmax)}<span class="val">${sg(w.bots.net)}</span><span>${w.bots.buyers}</span><span>${w.bots.sellers}</span></div>`+
-  (w.passthrough!=null&&w.passthrough>=40?`<p class="flag">${Math.round(w.passthrough)}% of this ${S.w==='1d'?"day's":S.w==='7d'?"week's":"month's"} volume came from wallets that held none before and none after. That's usually volume farming or wash trading, so read the net with care.</p>`:'')+
-  `<p class="note">${w.swaps.toLocaleString()} swaps in ${t.pools} main pools. Priced from ${t.pricing}. Pass-through share: ${w.passthrough==null?'\u2014':Math.round(w.passthrough)+'%'}.${t.category==='stocks'?' Net minted on the chain: '+sg(w.minted)+'.':''}</p>`;
- // stock tokens: minted vs bought
- const st=document.getElementById('stocks');
- if(S.c==='all'||S.c==='stocks'){st.hidden=false;document.getElementById('sread').textContent=M.sreads[S.w];
-  const SS=M.tokens.filter(x=>x.category==='stocks').sort((a,b)=>Math.abs(b.w[S.w].minted)+Math.abs(b.w[S.w].all.net)-Math.abs(a.w[S.w].minted)-Math.abs(a.w[S.w].all.net));
-  const smax=Math.max(1,...SS.map(x=>Math.max(Math.abs(x.w[S.w].minted),Math.abs(x.w[S.w].all.net))));
-  document.getElementById('stbl').innerHTML=`<tr><th>Stock token</th><th>Minted, net</th><th style="width:22%"></th><th>DEX net, all wallets</th><th style="width:22%"></th><th>Bots</th><th>Whales</th><th>Fresh wallets</th></tr>`+
-   SS.map(x=>{const v=x.w[S.w];return `<tr><td><b>${x.symbol}</b> <span class="rg">${x.name}</span></td><td class="${cls(v.minted)}">${sg(v.minted)}</td><td>${bar(v.minted,smax)}</td><td class="${cls(v.all.net)}">${sg(v.all.net)}</td><td>${bar(v.all.net,smax)}</td><td style="color:var(--soft)">${sg(v.bots.net)}</td><td class="${cls(v.whale.net)}">${sg(v.whale.net)}</td><td class="${cls(v.all.fresh_net)}">${sg(v.all.fresh_net)}</td></tr>`}).join('')}
- else st.hidden=true;
-}
-render();
+(function(){
+ const root=document.querySelector('[data-view="flows"]');if(!root)return;
+ const D=JSON.parse(document.getElementById('flows-data').textContent),$=id=>root.querySelector('#'+id);
+ const {fm,signed,pct,esc,av}=SOB,G=['whale','big','mid','small'];
+ const S={win:D.windows['7d']?'7d':'1d',grp:'all',side:null,open:null,all:false,watch:false};
+ const TOP=10,WL={'1d':'1D','7d':'7D','30d':'30D'},narrow=window.matchMedia('(max-width:860px)');
+ const net=t=>t.w[S.win].net[S.grp];
+ function row(t,i,max){
+  const w=t.w[S.win],v=net(t),of=t.size?Math.abs(v)/t.size*100:null,tag=w.tags[0],on=S.open===t.s,inl=on&&narrow.matches;
+  const star=SOB.watch.get().includes(t.s)?'<span class="star" title="On your watchlist">★</span>':'';
+  return `<li class="${on?'sel':''}"><button type="button" class="row${on?' sel':''}" data-s="${t.s}" aria-pressed="${on}"><span class="n">${i}</span>${av(t.s)}
+   <span><span class="tks">${star}${esc(t.s)}</span><span class="sub${tag?' tg':''}">${esc(tag?tag[1]:D.names[t.s]||t.s)}</span></span>
+   <span class="bar${v<0?' dn':''}"><i style="width:${Math.max(Math.abs(v)/max*100,2).toFixed(0)}%"></i></span>
+   <span class="val">${signed(v)}${of!=null?`<small>${of<0.005?'&lt;0.01':of.toFixed(2)}% of market cap</small>`:''}</span></button>${inl?`<div class="inl">${detail(t)}</div>`:''}</li>`}
+ function detail(t){
+  const w=t.w[S.win],max=Math.max(1,...G.map(g=>Math.abs(w.net[g])));
+  const cg=G.map(g=>{const v=w.net[g],p=Math.abs(v)/max*50;
+   return `<span>${D.glong[g]}</span><span class="zb"><i class="${v>=0?'u':'d'}" style="width:${p.toFixed(1)}%"></i></span><b>${signed(v)}</b>`}).join('');
+  const d=t.daily.slice(-14),dm=Math.max(1,...d.map(x=>Math.abs(x[1]))),bw=100/d.length;
+  const bars=d.map((x,i)=>{const h=Math.abs(x[1])/dm*22;return `<rect x="${(i*bw+bw*.14).toFixed(2)}" y="${x[1]>=0?(24-h).toFixed(2):24}" width="${(bw*.72).toFixed(2)}" height="${Math.max(h,.6).toFixed(2)}" rx=".7" fill="var(--${x[1]>=0?'up':'down'})"><title>${SOB.day(x[0])}: ${signed(x[1])}</title></rect>`}).join('');
+  const watched=SOB.watch.get().includes(t.s);
+  return `<div class="i-h">${av(t.s)}<span><b>${esc(t.s)}</b><small>${esc(D.names[t.s]||'')}</small></span><a href="${D.gt}${D.addr[t.s]}" target="_blank" rel="noopener">Chart ↗</a></div>
+   <div class="i-k"><div><span>Net, all wallets</span><b>${signed(w.net.all)}</b></div><div><span>Price, ${WL[S.win]}</span><b>${pct(w.chg)}</b></div><div><span>Market cap</span><b>${fm(t.size)}</b></div></div>
+   ${w.tags.map(x=>`<p class="i-s">${esc(x[2])}</p>`).join('')}
+   <p class="i-t">By wallet size</p><div class="cg">${cg}</div>
+   <div class="facts"><span><b>${w.buyers.toLocaleString()}</b> buyers</span><span><b>${w.sellers.toLocaleString()}</b> sellers</span><span><b>${w.fresh_n.toLocaleString()}</b> new wallets${w.fresh_n?` (${signed(w.fresh_net)})`:''}</span><span>Bots <b>${signed(w.bots)}</b></span></div>
+   <p class="i-t">Net flow per day, ${SOB.day(d[0][0])} to ${SOB.day(d[d.length-1][0])}</p>
+   <div class="dly"><svg viewBox="0 0 100 48" preserveAspectRatio="none" role="img" aria-label="Net flow per day">${bars}<line x1="0" x2="100" y1="24" y2="24" stroke="var(--line-2)" stroke-width=".4"/></svg></div>
+   <div class="det-f"><button type="button" class="wbtn" data-w="${t.s}">${watched?'★ On your watchlist':'☆ Watch'}</button><a class="wbtn" href="${D.links.holders}">Holders</a><a class="wbtn" href="${D.links.smart}">Smart money</a></div>`}
+ function render(){
+  SOB.seg($('f-win'),Object.keys(D.windows).map(w=>[w,WL[w]]),S.win,v=>{S.win=v;S.side=null;render()});
+  SOB.seg($('f-grp'),D.groups,S.grp,v=>{S.grp=v;S.side=null;render()});
+  const W=D.windows[S.win],R=D.read[S.win],wl=SOB.watch.get();
+  $('f-when').textContent=W.label;$('f-h').textContent=R.h;$('f-p').innerHTML=R.p;
+  const wb=$('f-watch');wb.hidden=!wl.length;wb.textContent=`★ Watchlist (${wl.length})`;if(!wl.length)S.watch=false;wb.classList.toggle('on',S.watch);
+  const T=D.tokens.filter(t=>!S.watch||wl.includes(t.s));
+  const buy=T.filter(t=>net(t)>1).sort((a,b)=>net(b)-net(a)),sell=T.filter(t=>net(t)<-1).sort((a,b)=>net(a)-net(b));
+  const sb=buy.reduce((a,t)=>a+net(t),0),ss=sell.reduce((a,t)=>a+net(t),0);
+  if(!S.side)S.side=(-ss>sb)?'sell':'buy';
+  if(S.side==='buy'&&!buy.length&&sell.length)S.side='sell';
+  if(S.side==='sell'&&!sell.length&&buy.length)S.side='buy';
+  SOB.seg($('f-side'),[['buy',`Bought · ${buy.length}`],['sell',`Sold · ${sell.length}`]],S.side,v=>{S.side=v;S.all=false;S.open=null;render()});
+  const items=S.side==='buy'?buy:sell,who=S.grp==='all'?'wallets':S.grp==='whale'?'whales':D.glong[S.grp].toLowerCase();
+  $('f-sum').textContent=items.length?`${signed(S.side==='buy'?sb:ss)} by ${who}${S.grp==='all'?'':' ('+D.ranges[S.grp]+')'}`:'';
+  if(!items.find(t=>t.s===S.open))S.open=items.length&&!narrow.matches?items[0].s:null;
+  if(S.open&&items.findIndex(t=>t.s===S.open)>=TOP)S.all=true;
+  const max=items.length?Math.max(...items.map(t=>Math.abs(net(t)))):1,shown=S.all?items:items.slice(0,TOP);
+  $('f-rows').innerHTML=items.length?shown.map((t,i)=>row(t,i+1,max)).join('')+(items.length>TOP?`<li style="border:0"><button type="button" class="all" data-all="1">${S.all?'Show top '+TOP:'Show all '+items.length}</button></li>`:'')
+   :`<li class="empty">No token was net ${S.side==='buy'?'bought':'sold'} by ${who} in this window.</li>`;
+  const insp=$('f-insp'),t=D.tokens.find(t=>t.s===S.open);
+  insp.innerHTML=t?detail(t):'<p class="empty">Pick a token to see who is behind its flow.</p>';
+  const L=D.look[S.win]||[];$('f-look-sec').hidden=!L.length;
+  $('f-look').innerHTML=L.map(x=>`<button type="button" class="lk" data-s="${x.s}"><span class="lk-t">${av(x.s,'s')}${esc(x.s)}</span><span class="lk-l">${esc(x.label)}</span><span class="lk-x">${esc(x.text)}</span></button>`).join('');
+  const C=D.cohorts[S.win],cm=Math.max(1,...G.map(g=>Math.abs(C[g].net)));
+  $('f-coh').innerHTML=G.map(g=>{const c=C[g],p=Math.abs(c.net)/cm*50;
+   return `<div class="ch"><div class="ch-l">${D.glong[g]}<small>${D.ranges[g]}</small></div><div class="ch-v">${signed(c.net)}</div><div class="zb"><i class="${c.net>=0?'u':'d'}" style="width:${p.toFixed(1)}%"></i></div><small class="c">Bought more in ${c.up}, sold more in ${c.down}</small></div>`}).join('');
+  $('f-apart').textContent=`New wallets: ${C.fresh.n.toLocaleString()} bought ${fm(C.fresh.net)} and still hold it. Bots and contracts: ${signed(C.bots.net)} across ${C.bots.n.toLocaleString()} addresses, counted apart.`;
+ }
+ root.addEventListener('click',e=>{
+  const w=e.target.closest('[data-w]');if(w){SOB.watch.toggle(w.dataset.w);render();return}
+  if(e.target.closest('[data-all]')){S.all=!S.all;render();return}
+  const lk=e.target.closest('.lk');if(lk){const t=D.tokens.find(t=>t.s===lk.dataset.s);S.grp='all';S.side=t.w[S.win].net.all>=0?'buy':'sell';S.open=t.s;render();
+   const r=root.querySelector(`.row[data-s="${t.s}"]`);if(r)r.scrollIntoView({block:'center',behavior:'smooth'});return}
+  const r=e.target.closest('.row');if(r){S.open=(S.open===r.dataset.s&&narrow.matches)?null:r.dataset.s;render();return}
+  if(e.target.closest('#f-watch')){S.watch=!S.watch;S.side=null;render()}
+ });
+ narrow.addEventListener('change',render);
+ render();
+})();
 """
 
 
-def page(model):
-    """The Flows content, its CSS and its data. Not a whole page: build_v4.flows_page() puts it in the site shell."""
-    data = json.dumps(model, separators=(",", ":")).replace("</", "<\\/")
-    ex = model["excluded"] + not_shown(model)
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Flows content</title>
-<!--flows-head--><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet"><!--/flows-head-->
-<style id="flows-css">{CSS}</style></head><body>
-<!--flows--><div class="fl">
-<div class="over">Flows<span class="beta">BETA</span></div>
-<h1>Who's buying Robinhood Chain</h1>
-<p class="read" id="read"></p>
-<p class="meta">Through {FM.dlong(model['asof'])}, end of day UTC. Read from Robinhood Chain, swap by swap, and priced with GeckoTerminal. Describes on-chain behaviour; not investment advice.</p>
-<div class="ctl"><div class="seg" id="s-w"></div><div class="seg" id="s-c"></div><span class="count" id="count"></span></div>
-<div class="grid">
- <section class="card"><div class="ch"><div><h2 id="rk-h"></h2><p class="sub" id="rk-sub"></p></div></div>
-  <div class="ctl" style="margin:16px 0 0"><div class="seg sm" id="s-g"></div><div class="seg sm" id="s-d"></div></div>
-  <div class="rank" id="rank"></div><button class="more" id="more"></button></section>
- <section class="card"><div class="ch"><div><h2>Across the chain</h2><p class="sub" id="acc-sub"></p></div></div>
-  <table id="across" style="margin-top:16px"></table>
-  <p class="note">Net: each group's net in every token shown, added together. All wallets is the four size groups together; fresh wallets and bots are counted apart from it.</p>
-  <div class="tdet" id="tdet"></div></section>
-</div>
-<section class="sec" id="stocks"><div class="ch"><div><h2>Stock tokens: minted vs bought</h2>
- <p>Minted is the change in each stock token's supply on the chain. DEX net is what wallets bought less what they sold in the pools; bots are the high-frequency traders and arbitrage contracts, counted apart.</p></div></div>
- <p class="sread" id="sread"></p><div class="card" style="padding:8px 24px 4px;overflow-x:auto"><table id="stbl" style="min-width:860px"></table></div></section>
-<details class="how"><summary>How to read it</summary><dl>
-<dt>Net</dt><dd>USD bought less USD sold in each token's main pools (pools with $5K+ of liquidity on Uniswap v3 and v4, Aerodrome Slipstream, Ramses and other v2/v3-style DEXs). Every swap is read from Robinhood Chain and valued at that hour's price.</dd>
-<dt>Who traded</dt><dd>The wallet whose token balance changed in the swap. Routers and aggregators pass tokens through and net to zero, so the trade lands on the wallet behind it.</dd>
-<dt>Wallet size</dt><dd>Each wallet that traded is sorted by its holding at the window's start or end, whichever is larger: whales $50K+, big $5K to $50K, mid $500 to $5K, small under $500. A whale that sold everything still counts as a whale.</dd>
-<dt>Fresh wallets</dt><dd>Wallets that held none of the token at the start of the window, ended up net buyers, and still hold at least half of what they bought. It's the closest on-chain read of new money that stayed.</dd>
-<dt>Pass-through</dt><dd>The share of a token's volume from wallets that held none of it before and none after: they bought and moved it on, or received and sold it. A high share usually means volume farming or wash trading.</dd>
-<dt>Bots and contracts</dt><dd>Wallets trading more than 100 times a day, and arbitrage, market-making and vault contracts trading 10+ times a day. They're shown apart and never inside a size group. Smart wallets (most RH traders use EIP-7702 or small wallet proxies) count as wallets.</dd>
-<dt>Checks</dt><dd>What wallets traded matches GeckoTerminal's volume for the same pools within about 7% for memes (CASHCAT +6%, AI −7% on Nov 20). Stock tokens read lower (SPCX −14%) because arbitrage that buys in one pool and sells in another inside a single transaction nets to zero for the wallet, while GeckoTerminal counts both legs.</dd>
-<dt>Windows</dt><dd>{windows_note(model)}</dd>
-<dt>Not counted</dt><dd>Plain transfers between wallets, adding or removing liquidity, and pools under $5K. Stock tokens' minting is shown separately, never as buying.</dd>
-<dt>Tokens</dt><dd>{len(model['tokens'])} tokens: memes and AI tokens with $100K+ of liquidity and 14+ days of trading, the largest stock tokens, and ecosystem tokens. {ex}</dd>
-</dl></details>
-<p class="fsrc">Data: Robinhood Chain (swaps, transfers, balances) and GeckoTerminal (prices, pools), through {FM.dlong(model['asof'])} UTC.</p>
-</div>
-<script type="application/json" id="flows-data">{data}</script>
-<script>{JS}</script><!--/flows-->
-</body></html>"""
-
-
-def model_from_page(path):
-    """The model a built page carries, e.g. to read its date (model_from_page(path)["asof"])."""
-    s = open(path).read()
-    a = s.index('<script type="application/json" id="flows-data">') + len('<script type="application/json" id="flows-data">')
-    return json.loads(s[a:s.index("</script>", a)])
+def views(cache, href, hm=None):
+    return [view(model(cache), href)]
 
 
 def main():
-    pos = [a for a in sys.argv[1:] if not a.startswith("--")]
-    opt = dict(a[2:].split("=", 1) for a in sys.argv[1:] if a.startswith("--") and "=" in a)
-    if len(pos) < 2:
+    if len(sys.argv) < 3:
         raise SystemExit(__doc__)
-    cache_dir, out = pos[0], pos[1]
+    cache, out = sys.argv[1], sys.argv[2]
     try:
-        model = FM.build(cache_dir)
-        wids = list(model["windows"])
-        model["reads"] = {w: read(model, w) for w in wids}
-        model["sreads"] = {w: stock_read(model, w) for w in wids}
-        model["labels"] = {w: window_label(model, w) for w in wids}
-        model["excluded"] = pos[2] if len(pos) > 2 else opt.get("note", NOTE)
-        errs, warns = check(model)
-    except (Exception, SystemExit) as e:
-        model, errs, warns = None, [f"could not build the model: {e}"], []
-    for w in warns:
-        print(f"::warning title=Flows::{w}")
-    if errs:
-        for e in errs:
-            print(f"::error title=Flows::{e}")
+        m = model(cache)
+        if len(m["tokens"]) < MIN_TOKENS:
+            raise RuntimeError(f"only {len(m['tokens'])} tokens")
+    except Exception as e:
         if os.path.exists(out):
-            print(f"::error title=Flows::page not updated; the last good page stays up (through {model_from_page(out)['asof']})")
-            return 0
-        print("::error title=Flows::no earlier page to fall back on")
-        return 1
+            print(f"::error title=Flows::kept the last good page ({e})"); return
+        raise
+    page = SH.page(view(m), f"Data through {dshort(m['asof'])}", m["meta"])
     tmp = out + ".tmp"
-    open(tmp, "w").write(page(model))
-    os.replace(tmp, out)
-    if opt.get("model"):
-        json.dump(model, open(opt["model"], "w"), separators=(",", ":"))
-    print(f"flows page: {len(model['tokens'])} tokens through {model['asof']}, windows {', '.join(w.upper() for w in model['windows'])}")
-    for w in model["windows"]:
-        print(f"  {w.upper()} | {model['reads'][w]}\n      | {model['sreads'][w]}")
-    return 0
+    open(tmp, "w", encoding="utf-8").write(page); os.replace(tmp, out)
+    r = m["read"]["7d" if "7d" in m["read"] else "1d"]
+    print(f"flows: {len(m['tokens'])} tokens through {m['asof']}. {r['h']}")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

@@ -1,13 +1,24 @@
-"""Render the Holder strength page from holder scans (holders_scan.py output).
-Usage: build_holders_page.py <states_dir> <out.html> [universe.json] [flows_cache]   (reads <SYM>.state.json.gz files)"""
-import glob, json, os, sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import flows_model as FM
-import holders_model as HM
-import build_flows_page as P
-import rh
+"""The Holders page: how firmly each Robinhood Chain token is held, and where its holders stand.
 
-NAMES = {"STANDARD": "The Standard Reserve"}      # where the token's own name isn't the project's
+  holder strength   0 to 100 from four parts on fixed scales (holders_model.py), with what moved it this week
+  where they stand  holder supply split by how far each holder is from their entry, and the average holder's result
+
+Crypto tokens with $50K+ of pool liquidity and 30+ days of daily prices. Built from the holder states the daily job
+rolls forward; the only chain read is one batched lookup for big holders the state hasn't classified yet.
+
+Usage: build_holders_page.py <cache_dir> <out.html>     cache_dir holds holders/<SYM>.state.json.gz and
+       tokens_meta.json. Also appends the day's scores to holders/history.json.
+"""
+import glob, gzip, json, os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import holders_model as HM
+import inflow as IN
+import site_shell as SH
+import rh
+from site_shell import fm, pct, dshort
+
+STEADY = 0.6            # share of tokens that must move the same way for the headline to say so
+STAND = ["Down 50% or more", "Down less than 50%", "Up less than 2×", "Up 2× or more"]
 
 
 def fill_kinds(st):
@@ -25,169 +36,195 @@ def fill_kinds(st):
     return len(todo)
 
 
-def build(sdir, names=None, passthrough=None):
-    toks, unbuildable, unpriced = [], [], []
+def model(cache_dir):
+    sdir = os.path.join(cache_dir, "holders")
+    meta = json.load(open(os.path.join(cache_dir, "tokens_meta.json")))
+    toks, left = [], {"thin": [], "unpriced": [], "unbuildable": []}
     for p in sorted(glob.glob(os.path.join(sdir, "*.state.json.gz"))):
         st = HM.load(p)
-        if fill_kinds(st):
-            import gzip
-            with gzip.open(p, "wt") as f:
-                json.dump(st, f, separators=(",", ":"))
+        sym = st["symbol"]
+        if (meta.get(sym) or {}).get("liq", 0) < IN.MIN_LIQ:
+            left["thin"].append(sym); continue
         if not st.get("rebuildable", True):
-            unbuildable.append(st["symbol"]); continue
+            left["unbuildable"].append(sym); continue
+        if fill_kinds(st):
+            tmp = p + ".tmp"
+            with gzip.open(tmp, "wt") as f:
+                json.dump(st, f, separators=(",", ":"))
+            os.replace(tmp, p)
         t = HM.token(st)
         if not t:
-            unpriced.append(st["symbol"]); continue
-        if t:
-            t["name"] = NAMES.get(t["symbol"]) or (names or {}).get(t["symbol"]) or t["symbol"]
-            t["moved"] = HM.what_moved(t)
-            toks.append(t)
+            left["unpriced"].append(sym); continue
+        t["moved"] = HM.what_moved(t); t["why"] = HM.why(t)
+        toks.append(t)
+    if not toks:
+        raise RuntimeError("holders: no token could be scored")
     asof = max(t["asof"] for t in toks)
-    stale = sorted(t["symbol"] for t in toks if t["asof"] != asof)       # state couldn't roll (a Flows day is missing)
+    left["stale"] = sorted(t["symbol"] for t in toks if t["asof"] != asof)
     toks = [t for t in toks if t["asof"] == asof]
-    for t in toks:
-        t["flags"] = ["pass-through"] if (passthrough or {}).get(t["symbol"], 0) >= 60 else []
-    return {"asof": asof, "tokens": toks, "stale": stale, "unbuildable": sorted(unbuildable), "unpriced": sorted(unpriced), "cats": [{"id": c, "label": l} for c, l in FM.CATS],
-            "labels": HM.LABELS, "weights": HM.WEIGHTS}
+    return {"asof": asof, "tokens": toks, "left": left, "meta": meta}
 
 
 def read(m):
     T = sorted(m["tokens"], key=lambda t: -t["now"]["score"])
-    if not T:
-        return "No token could be scored today."
-    clean = [t for t in T if not t.get("flags")]
-    top, low = (clean or T)[0], T[-1]
-    up = sum(1 for t in T if t["now"]["score"] > t["week_ago"]["score"] + 0.5)
-    dn = sum(1 for t in T if t["now"]["score"] < t["week_ago"]["score"] - 0.5)
-    mover = max(clean or T, key=lambda t: abs(t["now"]["score"] - t["week_ago"]["score"]))
-    d = mover["now"]["score"] - mover["week_ago"]["score"]
-    s = (f"{top['symbol']} has the strongest holders of the {len(T)} RH tokens we score ({top['now']['score']:.0f} out of 100), "
-         f"{low['symbol']} the weakest ({low['now']['score']:.0f}). ")
-    if abs(d) < 0.5:
-        s += "Scores barely moved this week."
-    else:
-        s += (f"Scores {'fell' if dn >= up else 'rose'} for {max(dn, up)} of {len(T)} this week; {mover['symbol']} moved most "
-              f"({'+' if d > 0 else '−'}{abs(d):.0f}) {HM.why(mover)}.")
-    flagged = [t for t in T if t.get("flags") and t["now"]["score"] > top["now"]["score"]]
-    if flagged:
-        f = flagged[0]
-        s += f" {f['symbol']} scores {f['now']['score']:.0f} but trades mostly as pass-through volume, so it's flagged."
-    return s
+    N = len(T)
+    d = lambda t: t["now"]["score"] - t["week_ago"]["score"]
+    up = sum(1 for t in T if d(t) > 0.5); dn = sum(1 for t in T if d(t) < -0.5)
+    h = ("Holders are getting weaker." if dn >= STEADY * N else "Holders are getting stronger." if up >= STEADY * N
+         else "Holders are holding steady.")
+    top, low = T[0], T[-1]
+    p = (f"<b>{top['symbol']}</b> has the firmest holders of the {N} tokens we score ({top['now']['score']:.0f} out of 100), "
+         f"{low['symbol']} the weakest ({low['now']['score']:.0f}).")
+    mover = max(T, key=lambda t: abs(d(t)))
+    if abs(d(mover)) >= 0.5:
+        p += (f" Scores {'fell' if dn >= up else 'rose'} for {max(dn, up)} of {N} this week; {mover['symbol']} moved most "
+              f"({'+' if d(mover) > 0 else SH.MINUS}{abs(d(mover)):.0f}) {mover['why']}.")
+    under = sum(1 for t in T if (t["now"]["facts"].get("avg_pl") or 0) < 0)
+    p += f" The average holder is underwater in {under} of {N}."
+    return {"h": h, "p": p}
 
+
+def view(m, href=lambda i: f"/{i}"):
+    T = []
+    for t in m["tokens"]:
+        n, w = t["now"], t["week_ago"]
+        T.append({"s": t["symbol"], "score": n["score"], "d": round(n["score"] - w["score"], 1), "parts": n["parts"],
+                  "was": w["parts"], "f": n["facts"], "moved": t["moved"], "chg": t["price_chg_7d"]})
+    data = {"asof": m["asof"], "tokens": T, "read": read(m), "labels": HM.LABELS,
+            "weights": {k: round(v * 100) for k, v in HM.WEIGHTS.items()}, "stand": STAND,
+            "names": {s: x["name"] for s, x in m["meta"].items()}, "addr": {s: x["address"] for s, x in m["meta"].items()},
+            "gt": "https://www.geckoterminal.com/robinhood/tokens/", "links": {"flows": href("flows"), "smart": href("smart-money")}}
+    lo = m["left"]
+    out = [x for x in (f"thin liquidity: {', '.join(lo['thin'])}" if lo["thin"] else "",
+                       f"too few daily prices: {', '.join(lo['unpriced'])}" if lo["unpriced"] else "",
+                       f"can't be rebuilt from transfers: {', '.join(lo['unbuildable'])}" if lo["unbuildable"] else "",
+                       f"waiting on a day of data: {', '.join(lo['stale'])}" if lo["stale"] else "") if x]
+    left = f" Left out today ({'; '.join(out)})." if out else ""
+    body = f"""
+<section class="pg-head">
+<p class="eyebrow">Holders · through {dshort(m['asof'])}</p>
+<h1 id="h-h"></h1>
+<p class="lede" id="h-p"></p>
+</section>
+
+<section class="sec">
+<div class="md">
+<div class="md-list"><div class="sec-h"><div class="seg" id="h-sort" role="group" aria-label="Order"></div><p class="md-sum">Holder strength, 0 to 100</p></div>
+<div class="panel"><ol class="rank" id="h-rows"></ol></div></div>
+<aside class="panel insp" id="h-insp" aria-live="polite"></aside>
+</div>
+</section>
+
+<details class="how"><summary>How this is measured</summary><dl>
+<dt>Who is a holder</dt><dd>Wallets only. Pools, other contracts and burn addresses are left out. Balances are rebuilt from every transfer since the token's first pool and match its total supply.</dd>
+<dt>Conviction (35%)</dt><dd>Share of holder supply held 30+ days by wallets that moved none out in that time. 0% scores 0, 80% scores 100.</dd>
+<dt>Top holders (25%)</dt><dd>How the 50 largest holders of a week ago changed their combined balance. −10% scores 0, flat scores 50, +10% scores 100.</dd>
+<dt>Breadth (20%)</dt><dd>Holders worth $10+ against a week ago, averaged with the share of last week's new holders who are still in.</dd>
+<dt>In profit (20%)</dt><dd>Share of holder supply whose last top-up was at or below today's price.</dd>
+<dt>Where holders stand</dt><dd>Each holder's entry is the price on the day they last added. Supply is split by how far today's price is from that entry; the average holder's result is today's price against the supply-weighted average entry. Not part of the score.</dd>
+<dt>Included</dt><dd>Crypto tokens on Robinhood Chain with $50K+ of pool liquidity and 30+ days of daily prices.{left}</dd>
+</dl></details>
+"""
+    return {"id": "holders", "title": "Holders", "desc": "How firmly each Robinhood Chain token is held, and where its holders stand.",
+            "body": body, "css": CSS, "js": JS, "data": data}
+
+
+CSS = r"""
+.pt{margin-top:10px}
+.pt-r{padding:11px 0;border-top:1px solid var(--line)}
+.pt-r:first-child{border-top:0}
+.pt-t{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14px;font-weight:500}
+.pt-t small{color:var(--ink-3);font-weight:400;font-size:12.5px;margin-left:6px}
+.pt-t b{font-weight:620;font-variant-numeric:tabular-nums}
+.pt-b{height:4px;margin:8px 0 7px;border-radius:2px;background:var(--raised)}
+.pt-b i{display:block;height:100%;border-radius:2px;background:var(--ink-2)}
+.pt-r p{margin:0;color:var(--ink-3);font-size:12.5px;line-height:1.4}
+.st{display:flex;gap:2px;height:10px;margin-top:12px}
+.st i{display:block;min-width:2px;border-radius:2px}
+.st .s0,.sk .s0{background:var(--down)}
+.st .s1,.sk .s1{background:color-mix(in srgb,var(--down) 42%,var(--raised))}
+.st .s2,.sk .s2{background:color-mix(in srgb,var(--up) 42%,var(--raised))}
+.st .s3,.sk .s3{background:var(--up)}
+.sk{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-top:12px;font-size:12.5px;color:var(--ink-2)}
+.sk span{display:flex;align-items:center;gap:7px}
+.sk i{display:inline-block;flex:none;width:9px;height:9px;border-radius:3px}
+.sk b{margin-left:auto;color:var(--ink);font-weight:550;font-variant-numeric:tabular-nums}
+.val .dl{font-size:12px;color:var(--ink-3);font-weight:400}
+.val .dl i{font-style:normal;font-size:8px;vertical-align:1px;margin-right:3px}
+"""
 
 JS = r"""
-const M=JSON.parse(document.getElementById('h-data').textContent);
-const S={c:'all',sort:'score',sel:null};
-const K=['conviction','top','breadth','profit'];
-const pct=x=>x==null?'—':(x>=0?'+':'−')+Math.abs(x).toFixed(1)+'%';
-function seg(el,key,opts){el.innerHTML=opts.map(([v,l])=>`<button data-v="${v}" class="${S[key]===v?'on':''}">${l}</button>`).join('');
- el.onclick=e=>{const b=e.target.closest('button');if(!b)return;S[key]=b.dataset.v;if(key==='c')S.sel=null;render()}}
-function meter(v){return `<div class="meter"><span style="width:${Math.max(1,v).toFixed(1)}%"></span></div>`}
-function render(){
- seg(document.getElementById('s-c'),'c',[['all','All'],...M.cats.filter(c=>M.tokens.some(t=>t.category===c.id)).map(c=>[c.id,c.label])]);
- seg(document.getElementById('s-s'),'sort',[['score','Strongest first'],['chg','Biggest change']]);
- const T=M.tokens.filter(t=>S.c==='all'||t.category===S.c).sort((a,b)=>S.sort==='score'?b.now.score-a.now.score:Math.abs(b.now.score-b.week_ago.score)-Math.abs(a.now.score-a.week_ago.score));
- if(!S.sel||!T.includes(S.sel))S.sel=T.find(t=>!t.flags.length)||T[0];
- document.getElementById('count').textContent=T.length+' tokens';
- document.getElementById('hl').innerHTML=T.map((t,i)=>{const d=t.now.score-t.week_ago.score;
-  return `<div class="hrow ${t===S.sel?'sel':''}" data-s="${t.symbol}"><span class="n">${i+1}</span><span class="tk"><b>${t.symbol}</b>${t.flags.includes('pass-through')?'<i class="pt" title="Most of its volume is pass-through: see Flows">pass-through</i>':''}<small>${t.name}</small></span>
-  <span class="sc">${Math.round(t.now.score)}</span>${meter(t.now.score)}<span class="val ${Math.abs(d)<0.5?'':d>0?'p':'m'}">${Math.abs(d)<0.5?'±0':(d>0?'+':'−')+Math.abs(d).toFixed(0)}</span></div>`}).join('');
- document.getElementById('hl').onclick=e=>{const r=e.target.closest('.hrow');if(!r)return;S.sel=M.tokens.find(t=>t.symbol===r.dataset.s);render()};
- const t=S.sel;if(!t)return;const f=t.now.facts,g=t.week_ago.facts;
- const rows=[['conviction',`${f.conviction.toFixed(0)}% of holder supply untouched for 30+ days`,`${g.conviction.toFixed(0)}% a week ago`],
-  ['top',`50 largest holders ${f.top_chg>=0?'added':'cut'} ${Math.abs(f.top_chg).toFixed(1)}% this week`,`${g.top_chg>=0?'added':'cut'} ${Math.abs(g.top_chg).toFixed(1)}% the week before`],
-  ['breadth',`${f.holders.toLocaleString()} holders worth $10+ (${pct(f.holders_chg)} on the week)`+(f.kept!=null?`; ${f.kept.toFixed(0)}% of ${f.new} new holders still in`:''),`${g.holders.toLocaleString()} a week ago`],
-  ['profit',`${f.in_profit.toFixed(0)}% of holder supply in profit`,`${g.in_profit.toFixed(0)}% a week ago`]];
- document.getElementById('det').innerHTML=`<div class="hd"><b>${t.symbol}</b><span>${t.name}</span><a class="chip" style="margin-left:auto" href="https://www.geckoterminal.com/robinhood/tokens/${t.token}" target="_blank" rel="noopener">Chart ↗</a></div>
-  <div class="big"><b>${Math.round(t.now.score)}</b><span>out of 100 · ${Math.round(t.week_ago.score)} a week ago · price ${pct(t.price_chg_7d)} on the week</span></div>
-  <p class="moved">${t.moved}</p>`+
-  rows.map(([k,a,b])=>`<div class="part"><div class="ph"><span>${M.labels[k]} <i>${Math.round(M.weights[k]*100)}%</i></span><b>${Math.round(t.now.parts[k])}</b></div>${meter(t.now.parts[k])}<p>${a} <span>· ${b}</span></p></div>`).join('')+
-  (t.flags.includes('pass-through')?`<p class="flag">Most of this token's trading volume comes from wallets that held none before and none after (Flows' pass-through share). Its price, and so its in-profit share, may be propped up by wash trading.</p>`:'')+
-  `<p class="note">Top 10 holders own ${f.top10.toFixed(0)}% of holder supply. ${t.transfers.toLocaleString()} transfers read, every one since the token's first pool.</p>`;
-}
-render();
-"""
-
-EXTRA_CSS = r"""
-.fl .hrow{display:grid;grid-template-columns:22px minmax(0,150px) 44px minmax(0,1fr) 46px;gap:12px;align-items:center;padding:8px;border-radius:9px;cursor:pointer}
-.fl .hrow:hover{background:var(--card2)}
-.fl .hrow.sel{background:var(--card2);box-shadow:inset 0 0 0 1px var(--line2)}
-.fl .hrow .n{font:12px var(--mono);color:var(--faint);text-align:right}
-.fl .sc{font-size:18px;font-weight:650;text-align:right;letter-spacing:-.02em}
-.fl .meter{height:8px;background:var(--card2);border-radius:4px;overflow:hidden}
-.fl .meter span{display:block;height:100%;background:var(--lime-ink);border-radius:4px}
-.fl #det .hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.fl #det .hd b{font-size:19px}
-.fl #det .hd span{color:var(--soft);font-size:13px}
-.fl .big{display:flex;align-items:baseline;gap:12px;margin:14px 0 4px;flex-wrap:wrap}
-.fl .big b{font-size:52px;letter-spacing:-.04em;line-height:1}
-.fl .big span{color:var(--soft);font-size:13px}
-.fl .moved{font-size:14.5px;line-height:1.55;margin:10px 0 16px}
-.fl .part{border-top:1px solid var(--line);padding:12px 0}
-.fl .ph{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-size:14px;font-weight:600}
-.fl .ph i{font:500 11px var(--mono);color:var(--faint);font-style:normal;margin-left:6px}
-.fl .part p{margin:8px 0 0;font-size:13px;color:var(--ink);line-height:1.5}
-.fl .part p span{color:var(--faint)}
-@media (max-width:620px){.fl .hrow{grid-template-columns:18px minmax(0,90px) 34px minmax(0,1fr) 36px;gap:8px;padding:8px 4px}}
+(function(){
+ const root=document.querySelector('[data-view="holders"]');if(!root)return;
+ const D=JSON.parse(document.getElementById('holders-data').textContent),$=id=>root.querySelector('#'+id);
+ const {fm,signed,pct,esc,av}=SOB,narrow=window.matchMedia('(max-width:860px)'),K=['conviction','top','breadth','profit'];
+ const S={sort:'top',open:null,all:false},TOP=10;
+ const dl=d=>Math.abs(d)<0.5?'no change this week':`<i class="${d>0?'up':'dn'}">${d>0?'▲':'▼'}</i>${Math.abs(d).toFixed(0)} this week`;
+ function fact(k,f){
+  if(k==='conviction')return `${f.conviction.toFixed(0)}% of holder supply has sat untouched for 30+ days.`;
+  if(k==='top')return Math.abs(f.top_chg)<0.05?'The 50 largest holders were flat this week.':`The 50 largest holders ${f.top_chg>=0?'added':'cut'} ${Math.abs(f.top_chg).toFixed(1)}% this week. The top 10 hold ${f.top10.toFixed(0)}%.`;
+  if(k==='breadth')return `${f.holders.toLocaleString()} holders worth $10+, ${pct(f.holders_chg)} on the week${f.kept==null?'':`; ${f.kept.toFixed(0)}% of last week's new holders stayed`}.`;
+  return `${f.in_profit.toFixed(0)}% of holder supply was last added at or below today's price.`}
+ function row(t,i){
+  const on=S.open===t.s,inl=on&&narrow.matches,star=SOB.watch.get().includes(t.s)?'<span class="star">★</span>':'';
+  return `<li class="${on?'sel':''}"><button type="button" class="row" data-s="${t.s}" aria-pressed="${on}"><span class="n">${i}</span>${av(t.s)}
+   <span><span class="tks">${star}${esc(t.s)}</span><span class="sub">${esc(D.names[t.s]||t.s)}</span></span>
+   <span class="bar nt"><i style="width:${Math.max(t.score,2).toFixed(0)}%"></i></span>
+   <span class="val">${t.score.toFixed(0)}<small class="dl">${dl(t.d)}</small></span></button>${inl?`<div class="inl">${detail(t)}</div>`:''}</li>`}
+ function detail(t){
+  const f=t.f,w=SOB.watch.get().includes(t.s);
+  const parts=K.map(k=>`<div class="pt-r"><div class="pt-t"><span>${D.labels[k]}<small>${D.weights[k]}% of the score</small></span><b>${t.parts[k].toFixed(0)}</b></div><div class="pt-b" role="img" aria-label="${t.parts[k].toFixed(0)} out of 100"><i style="width:${Math.max(t.parts[k],2)}%"></i></div><p>${fact(k,f)}</p></div>`).join('');
+  const st=f.stand?`<p class="i-t">Where holders stand against their entry</p><div class="st" role="img" aria-label="Holder supply by distance from entry">${f.stand.map((x,i)=>x>0?`<i class="s${i}" style="flex:${x}" title="${D.stand[i]}: ${x.toFixed(0)}%"></i>`:'').join('')}</div>
+   <div class="sk">${f.stand.map((x,i)=>`<span><i class="s${i}"></i>${D.stand[i]}<b>${x.toFixed(0)}%</b></span>`).join('')}</div>
+   ${f.avg_pl==null?'':`<p class="i-s">The average holder is ${f.avg_pl>=0?'up':'down'} ${Math.abs(f.avg_pl).toFixed(0)}% on entry.</p>`}`:'';
+  return `<div class="i-h">${av(t.s)}<span><b>${esc(t.s)}</b><small>${esc(D.names[t.s]||'')}</small></span><a href="${D.gt}${D.addr[t.s]}" target="_blank" rel="noopener">Chart ↗</a></div>
+   <div class="i-k"><div><span>Holder strength</span><b>${t.score.toFixed(0)}</b></div><div><span>This week</span><b>${Math.abs(t.d)<0.5?'0':(t.d>0?'+':'−')+Math.abs(t.d).toFixed(0)}</b></div><div><span>Price, 7D</span><b>${pct(t.chg)}</b></div></div>
+   ${SOB.ascii(t.score)}
+   <p class="i-s">${esc(t.moved)}</p>
+   <div class="pt">${parts}</div>${st}
+   <div class="det-f"><button type="button" class="wbtn" data-w="${t.s}">${w?'★ On your watchlist':'☆ Watch'}</button><a class="wbtn" href="${D.links.flows}">Flows</a><a class="wbtn" href="${D.links.smart}">Smart money</a></div>`}
+ function render(){
+  $('h-h').textContent=D.read.h;$('h-p').innerHTML=D.read.p;
+  SOB.seg($('h-sort'),[['top','Firmest'],['low','Weakest'],['move','Moved most']],S.sort,v=>{S.sort=v;S.all=false;S.open=null;render()});
+  const items=[...D.tokens].sort((a,b)=>S.sort==='top'?b.score-a.score:S.sort==='low'?a.score-b.score:Math.abs(b.d)-Math.abs(a.d));
+  if(!items.find(t=>t.s===S.open))S.open=items.length&&!narrow.matches?items[0].s:null;
+  const shown=S.all?items:items.slice(0,TOP);
+  $('h-rows').innerHTML=shown.map((t,i)=>row(t,i+1)).join('')+(items.length>TOP?`<li style="border:0"><button type="button" class="all" data-all="1">${S.all?'Show top '+TOP:'Show all '+items.length}</button></li>`:'');
+  const t=D.tokens.find(t=>t.s===S.open);$('h-insp').innerHTML=t?detail(t):'<p class="empty">Pick a token to see its four parts.</p>';
+  SOB.fit(root);
+ }
+ root.addEventListener('click',e=>{
+  const w=e.target.closest('[data-w]');if(w){SOB.watch.toggle(w.dataset.w);render();return}
+  if(e.target.closest('[data-all]')){S.all=!S.all;render();return}
+  const r=e.target.closest('.row');if(r){S.open=(S.open===r.dataset.s&&narrow.matches)?null:r.dataset.s;render()}
+ });
+ narrow.addEventListener('change',render);
+ window.addEventListener('resize',()=>SOB.fit(root));
+ window.addEventListener('sob:view',e=>{if(e.detail==='holders')SOB.fit(root)});
+ render();
+})();
 """
 
 
-def page(m):
-    data = json.dumps(m, separators=(",", ":")).replace("</", "<\\/")
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Holders content</title>
-<!--flows-head--><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet"><!--/flows-head-->
-<style id="flows-css">{P.CSS}{EXTRA_CSS}</style></head><body>
-<!--flows--><div class="fl">
-<div class="over">Holder strength<span class="beta">BETA</span></div>
-<h1>Are RH holders holding?</h1>
-<p class="read">{read(m)}</p>
-<p class="meta">Through {FM.dlong(m['asof'])} UTC, from every transfer since each token's first pool. Not investment advice.</p>
-<div class="ctl"><div class="seg" id="s-c"></div><div class="seg" id="s-s"></div><span class="count" id="count"></span></div>
-<div class="grid">
- <section class="card"><div class="ch"><div><h2>Holder strength, 0 to 100</h2><p class="sub">Change is against a week ago. Click a token for its four parts.</p></div></div>
-  <div class="rank" id="hl"></div></section>
- <section class="card" id="det"></section>
-</div>
-<details class="how"><summary>How to read it</summary><dl>
-<dt>Holders</dt><dd>Wallets holding the token, including smart wallets (EIP-7702 and small wallet proxies). Pools, the Uniswap v4 pool manager, other contracts and burn addresses are left out.</dd>
-<dt>Conviction, 35%</dt><dd>The share of holder supply held for 30+ days by wallets that moved none of it out in that time. 0% scores 0, 80% or more scores 100.</dd>
-<dt>Top holders, 25%</dt><dd>How the 50 largest holders of a week ago changed their combined balance since. Cutting 10% or more scores 0, flat scores 50, adding 10% or more scores 100.</dd>
-<dt>Breadth, 20%</dt><dd>The number of holders worth $10+ against a week ago (at today's price, so price moves don't change the count), averaged with the share of wallets that became holders 8 to 14 days ago and still hold. Shrinking 10% scores 0, growing 10% scores 100; keeping 80% of new holders scores 100.</dd>
-<dt>In profit, 20%</dt><dd>The share of holder supply whose last top-up was at or below today's price: holders sitting on gains have less reason to sell into a bounce. The score is that share.</dd>
-<dt>Fixed scales</dt><dd>Every part uses the same scale for every token and every day, so a 60 means the same thing on PONS as on a meme, and today's score can be compared with last month's.</dd>
-<dt>Tokens</dt><dd>Memes, AI and agent tokens, and ecosystem tokens from Flows. Stock tokens are left out: their holders follow the stock, not the project.{(' Not shown today: ' + ', '.join(m['stale']) + " (a day of transfers is still missing).") if m.get('stale') else ''}{(' Not scored: ' + ', '.join(m['unpriced']) + " (not enough daily prices)." ) if m.get('unpriced') else ''}{(' Not scored: ' + ', '.join(m['unbuildable']) + ", whose balances change without transfer events (reflections), so they can't be rebuilt from transfers.") if m.get('unbuildable') else ''}</dd>
-</dl></details>
-<p class="fsrc">Data: Robinhood Chain (every transfer since each token's first pool) and GeckoTerminal (prices), through {FM.dlong(m['asof'])} UTC.</p>
-</div>
-<script type="application/json" id="h-data">{data}</script>
-<script>{JS}</script><!--/flows-->
-</body></html>"""
+def views(cache, href, hm=None):
+    return [view(model(cache), href)]
 
 
 def main():
     if len(sys.argv) < 3:
         raise SystemExit(__doc__)
-    names = {}
-    if len(sys.argv) > 3:
-        names = {t["symbol"]: t.get("name") or t["symbol"] for t in json.load(open(sys.argv[3]))}
-    pt = {}
-    if len(sys.argv) > 4:                    # flows cache: flag tokens whose 7D volume is mostly pass-through
-        fm = FM.build(sys.argv[4])
-        w = "7d" if "7d" in fm["windows"] else "1d"
-        pt = {t["symbol"]: (t["w"][w].get("passthrough") or 0) for t in fm["tokens"]}
-    m = build(sys.argv[1], names, pt)
-    # keep a daily score history next to the states, for trend lines later
-    hp = os.path.join(sys.argv[1], "history.json")
+    m = model(sys.argv[1])
+    hp = os.path.join(sys.argv[1], "holders", "history.json")        # a daily score history, for trend lines later
     hist = json.load(open(hp)) if os.path.exists(hp) else {}
     hist[m["asof"]] = {t["symbol"]: t["now"]["score"] for t in m["tokens"]}
     json.dump(hist, open(hp, "w"), separators=(",", ":"))
-    html = page(m)
+    page = SH.page(view(m), f"Data through {dshort(m['asof'])}", m["meta"])
     tmp = sys.argv[2] + ".tmp"
-    open(tmp, "w").write(html)
-    os.replace(tmp, sys.argv[2])
-    print(read(m))
+    open(tmp, "w", encoding="utf-8").write(page); os.replace(tmp, sys.argv[2])
+    r = read(m)
+    print("holders:", r["h"], f"{len(m['tokens'])} tokens through {m['asof']}")
     for t in sorted(m["tokens"], key=lambda t: -t["now"]["score"]):
-        print(f"  {t['symbol']:9s} {t['now']['score']:5.1f} (wk {t['week_ago']['score']:5.1f}) parts {t['now']['parts']} | {t['moved']}")
+        print(f"  {t['symbol']:9s} {t['now']['score']:5.1f} (wk {t['week_ago']['score']:5.1f}) | {t['moved']}")
 
 
 if __name__ == "__main__":
