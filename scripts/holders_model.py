@@ -12,7 +12,10 @@ Four parts, each 0-100, on fixed scales so a score means the same thing for ever
   Breadth (20%)      holders worth $10+ now vs a week ago (at today's price), averaged with how many of the wallets
                      that became holders 8-14 days ago still hold. -10% -> 0, flat -> 50, +10% -> 100; 0% kept -> 0, 80%+ kept -> 100
   In profit (20%)    share of holder supply whose last top-up was at or below today's price. 0% -> 0, 100% -> 100
-The same parts are worked out as of a week earlier, so each token's read says what moved.
+The same parts are worked out as of a day, a week and 30 days earlier (WINDOWS), so each token's read says what
+moved over the window picked on the page. The parts themselves keep their own spans whatever the window: the top
+holders' change is always over 7 days, conviction always over 30. A token gets a 30-day comparison only once it
+has 60 days of prices, so that its parts 30 days ago had enough history behind them.
 
 Where holders stand (facts, not part of the score): each holder's entry is the price on the day of their last
 top-up. `stand` splits holder supply into down 50%+, down less than 50%, up less than 2x, and up 2x or more against
@@ -24,6 +27,9 @@ WALLET_KINDS = {"eoa", "7702", "c62", "c46"}
 BURN = {"0x0000000000000000000000000000000000000000", "0x000000000000000000000000000000000000dead"}
 WEIGHTS = {"conviction": 0.35, "top": 0.25, "breadth": 0.20, "profit": 0.20}
 LABELS = {"conviction": "Conviction", "top": "Top holders", "breadth": "Breadth", "profit": "In profit"}
+WINDOWS = (("1d", 1), ("7d", 7), ("30d", 30))
+AGO = {"1d": "a day ago", "7d": "a week ago", "30d": "30 days ago"}
+SPAN = {"1d": "on the day", "7d": "this week", "30d": "in 30 days"}
 
 
 def lin(x, lo, hi):
@@ -126,21 +132,59 @@ def token(st):
     p_now, p_wk = price_on(st["closes"], d), price_on(st["closes"], shift(d, -7))
     if not p_now:
         return None
+    week = parts(st, shift(d, -7), p_wk)
+    first = min(k for k in st["closes"])
+    then, chg = {}, {}
+    for wid, n in WINDOWS:
+        dn = shift(d, -n)
+        pn = price_on(st["closes"], dn)
+        chg[wid] = round((p_now / pn - 1) * 100, 1) if pn else None
+        if wid == "7d":
+            then[wid] = week
+        elif n < 30 or first <= shift(dn, -30):
+            then[wid] = parts(st, dn, pn)
+        else:
+            then[wid] = None; chg[wid] = None
     return {"symbol": st["symbol"], "token": st["token"], "category": st["category"], "price": p_now,
             "price_chg_7d": round((p_now / p_wk - 1) * 100, 1) if p_wk else None, "asof": d,
-            "now": parts(st, d, p_now), "week_ago": parts(st, shift(d, -7), p_wk), "transfers": st.get("transfers")}
+            "now": parts(st, d, p_now), "week_ago": week, "then": then, "price_chg": chg, "transfers": st.get("transfers")}
 
 
-def what_moved(t):
-    """One sentence on the part that moved the score most this week."""
-    a, b = t["now"], t["week_ago"]
+def _top(x, noun=False):
+    """The 50 largest holders' 7-day change, in words: 'cut 7.2%' or, as a noun, 'a 7.2% cut'."""
+    if abs(x) < 0.05:
+        return "flat" if noun else "were flat"
+    return f"a {abs(x):.1f}% {'add' if x > 0 else 'cut'}" if noun else f"{'added' if x > 0 else 'cut'} {abs(x):.1f}%"
+
+
+def _count(x, noun=False):
+    """Holders worth $10+ against a week earlier, in words: 'grew 3.1%' or, as a noun, 'a 3.1% rise'."""
+    if abs(x) < 0.05:
+        return "flat" if noun else "were flat"
+    return f"a {abs(x):.1f}% {'rise' if x > 0 else 'fall'}" if noun else f"{'grew' if x > 0 else 'shrank'} {abs(x):.1f}%"
+
+
+def what_moved(t, wid="7d"):
+    """One sentence on the part that moved the score most over the window."""
+    a, b = t["now"], t["then"][wid]
+    if b is None:
+        return ""
     dd = {k: (a["parts"][k] - b["parts"][k]) * WEIGHTS[k] for k in WEIGHTS}
     total = a["score"] - b["score"]
     same = [x for x in dd if dd[x] * total > 0]          # explain the move with a part that pushed the same way
     k = max(same or dd, key=lambda x: abs(dd[x]))
     f, g = a["facts"], b["facts"]
     if abs(dd[k]) < 1:
-        return "Little changed this week."
+        return f"Little changed {SPAN[wid]}."
+    if wid != "7d":                       # the week's wording below compares two weeks; other windows compare two readings
+        if k == "conviction":
+            return (f"Conviction {'rose' if dd[k] > 0 else 'fell'}: {f['conviction']:.0f}% of holder supply has sat untouched "
+                    f"for 30+ days, from {g['conviction']:.0f}% {AGO[wid]}.")
+        if k == "top":
+            return f"The 50 largest holders {_top(f['top_chg'])} over the last 7 days, from {_top(g['top_chg'], True)} {AGO[wid]}."
+        if k == "breadth":
+            return f"Holders worth $10+ {_count(f['holders_chg'])} over the last 7 days, from {_count(g['holders_chg'], True)} {AGO[wid]}."
+        return f"{f['in_profit']:.0f}% of holder supply is in profit, {'up' if f['in_profit'] >= g['in_profit'] else 'down'} from {g['in_profit']:.0f}% {AGO[wid]}."
     if k == "conviction":
         return (f"Conviction {'rose' if dd[k] > 0 else 'fell'}: {f['conviction']:.0f}% of holder supply has sat untouched "
                 f"for 30+ days, from {g['conviction']:.0f}% a week ago.")
@@ -161,15 +205,19 @@ def what_moved(t):
     return f"{f['in_profit']:.0f}% of holder supply is in profit, {'up' if f['in_profit'] >= g['in_profit'] else 'down'} from {g['in_profit']:.0f}% a week ago."
 
 
-def why(t):
-    """A short clause on the part that pushed this week's move: 'as its 50 largest holders cut 11.5%'."""
-    a, b = t["now"], t["week_ago"]
+def why(t, wid="7d"):
+    """A short clause on the part that pushed the window's move: 'as its 50 largest holders cut 11.5%'."""
+    a, b = t["now"], t["then"][wid]
     dd = {k: (a["parts"][k] - b["parts"][k]) * WEIGHTS[k] for k in WEIGHTS}
     total = a["score"] - b["score"]
     k = max([x for x in dd if dd[x] * total > 0] or dd, key=lambda x: abs(dd[x]))
     f, g = a["facts"], b["facts"]
     if k == "conviction":
         return f"as untouched supply {'rose' if f['conviction'] >= g['conviction'] else 'fell'} to {f['conviction']:.0f}%"
+    if k == "top" and wid != "7d":
+        return f"as its 50 largest holders went from {_top(g['top_chg'], True)} to {_top(f['top_chg'], True)}"
+    if k == "breadth" and wid != "7d":
+        return f"as holders worth $10+ went from {_count(g['holders_chg'], True)} to {_count(f['holders_chg'], True)}"
     if k == "top":
         return f"as its 50 largest holders {'added' if f['top_chg'] >= 0 else 'cut'} {abs(f['top_chg']):.1f}%"
     if k == "breadth":

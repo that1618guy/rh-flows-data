@@ -1,6 +1,7 @@
 """The Holders page: how firmly each Robinhood Chain token is held, and where its holders stand.
 
-  holder strength   0 to 100 from four parts on fixed scales (holders_model.py), with what moved it this week
+  holder strength   0 to 100 from four parts on fixed scales (holders_model.py), with what moved it over the
+                    window picked at the top: 1D, 7D, or 30D once most tokens have 60 days of prices
   where they stand  holder supply split by how far each holder is from their entry, and the average holder's result
 
 Crypto tokens with $50K+ of pool liquidity and 30+ days of daily prices. Built from the holder states the daily job
@@ -18,6 +19,7 @@ import rh
 from site_shell import fm, pct, dshort
 
 STEADY = 0.6            # share of tokens that must move the same way for the headline to say so
+OVER = {"1d": "on the day", "7d": "this week", "30d": "over 30 days"}
 STAND = ["Down 50% or more", "Down less than 50%", "Up less than 2×", "Up 2× or more"]
 
 
@@ -58,42 +60,47 @@ def model(cache_dir):
         t = HM.token(st)
         if not t:
             left["unpriced"].append(sym); continue
-        t["moved"] = HM.what_moved(t); t["why"] = HM.why(t)
+        t["moved"] = {w: HM.what_moved(t, w) for w, _ in HM.WINDOWS}
         toks.append(t)
     if not toks:
         raise RuntimeError("holders: no token could be scored")
     asof = max(t["asof"] for t in toks)
     left["stale"] = sorted(t["symbol"] for t in toks if t["asof"] != asof)
     toks = [t for t in toks if t["asof"] == asof]
-    return {"asof": asof, "tokens": toks, "left": left, "meta": meta}
+    # a window is offered when most tokens can be compared over it (30 days needs 60 days of prices)
+    wins = [w for w, _ in HM.WINDOWS if sum(1 for t in toks if t["then"][w]) >= 0.8 * len(toks)]
+    return {"asof": asof, "tokens": toks, "left": left, "meta": meta, "wins": wins}
 
 
-def read(m):
+def read(m, wid="7d"):
     T = sorted(m["tokens"], key=lambda t: -t["now"]["score"])
     N = len(T)
-    d = lambda t: t["now"]["score"] - t["week_ago"]["score"]
-    up = sum(1 for t in T if d(t) > 0.5); dn = sum(1 for t in T if d(t) < -0.5)
-    h = ("Holders are getting weaker." if dn >= STEADY * N else "Holders are getting stronger." if up >= STEADY * N
+    C = [t for t in T if t["then"][wid]]                   # the tokens that can be compared over this window
+    M = len(C)
+    d = lambda t: t["now"]["score"] - t["then"][wid]["score"]
+    up = sum(1 for t in C if d(t) > 0.5); dn = sum(1 for t in C if d(t) < -0.5)
+    h = ("Holders are getting weaker." if dn >= STEADY * M else "Holders are getting stronger." if up >= STEADY * M
          else "Holders are holding steady.")
     top, low = T[0], T[-1]
     p = (f"<b>{top['symbol']}</b> has the firmest holders of the {N} tokens we score ({top['now']['score']:.0f} out of 100), "
          f"{low['symbol']} the weakest ({low['now']['score']:.0f}).")
-    mover = max(T, key=lambda t: abs(d(t)))
+    mover = max(C, key=lambda t: abs(d(t)))
     if abs(d(mover)) >= 0.5:
-        p += (f" Scores {'fell' if dn >= up else 'rose'} for {max(dn, up)} of {N} this week; {mover['symbol']} moved most "
-              f"({'+' if d(mover) > 0 else SH.MINUS}{abs(d(mover)):.0f}) {mover['why']}.")
+        p += (f" Scores {'fell' if dn >= up else 'rose'} for {max(dn, up)} of {M} {OVER[wid]}; {mover['symbol']} moved most "
+              f"({'+' if d(mover) > 0 else SH.MINUS}{abs(d(mover)):.0f}) {HM.why(mover, wid)}.")
     under = sum(1 for t in T if (t["now"]["facts"].get("avg_pl") or 0) < 0)
     p += f" The average holder is underwater in {under} of {N}."
     return {"h": h, "p": p}
 
 
 def view(m, href=lambda i: f"/{i}"):
-    T = []
+    T, W = [], m["wins"]
     for t in m["tokens"]:
-        n, w = t["now"], t["week_ago"]
-        T.append({"s": t["symbol"], "score": n["score"], "d": round(n["score"] - w["score"], 1), "parts": n["parts"],
-                  "was": w["parts"], "f": n["facts"], "moved": t["moved"], "chg": t["price_chg_7d"]})
-    data = {"asof": m["asof"], "tokens": T, "read": read(m), "labels": HM.LABELS,
+        n = t["now"]
+        T.append({"s": t["symbol"], "score": n["score"], "parts": n["parts"], "f": n["facts"],
+                  "d": {w: round(n["score"] - t["then"][w]["score"], 1) if t["then"][w] else None for w in W},
+                  "moved": {w: t["moved"][w] for w in W}, "chg": {w: t["price_chg"][w] for w in W}})
+    data = {"asof": m["asof"], "tokens": T, "wins": W, "read": {w: read(m, w) for w in W}, "labels": HM.LABELS,
             "weights": {k: round(v * 100) for k, v in HM.WEIGHTS.items()}, "stand": STAND,
             "names": {s: x["name"] for s, x in m["meta"].items()}, "addr": {s: x["address"] for s, x in m["meta"].items()},
             "gt": "https://www.geckoterminal.com/robinhood/tokens/", "links": {"flows": href("flows"), "smart": href("smart-money")}}
@@ -109,6 +116,7 @@ def view(m, href=lambda i: f"/{i}"):
 <p class="eyebrow">Holders · through {dshort(m['asof'])} <span class="nb">· updated daily</span></p>
 <h1 id="h-h"></h1>
 <p class="lede" id="h-p"></p>
+<div class="ctl pg-ctl"><div class="seg" id="h-win" role="group" aria-label="Change over"></div></div>
 </section>
 
 <section class="sec">
@@ -120,6 +128,7 @@ def view(m, href=lambda i: f"/{i}"):
 </section>
 
 <details class="how"><summary>How this is measured</summary><dl>
+<dt>1D, 7D, 30D</dt><dd>The window sets what today's score is compared with: a day, a week or 30 days ago. The score itself is the same in all three, and its parts keep their own spans (top holders over 7 days, conviction over 30). A token gets a 30-day comparison once it has 60 days of prices.</dd>
 <dt>Who is a holder</dt><dd>Wallets only. Pools, other contracts and burn addresses are left out. Balances are rebuilt from every transfer since the token's first pool and match its total supply.</dd>
 <dt>Conviction (35%)</dt><dd>Share of holder supply held 30+ days by wallets that moved none out in that time. 0% scores 0, 80% scores 100.</dd>
 <dt>Top holders (25%)</dt><dd>How the 50 largest holders of a week ago changed their combined balance. −10% scores 0, flat scores 50, +10% scores 100.</dd>
@@ -162,8 +171,9 @@ JS = r"""
  const root=document.querySelector('[data-view="holders"]');if(!root)return;
  const D=JSON.parse(document.getElementById('holders-data').textContent),$=id=>root.querySelector('#'+id);
  const {fm,signed,pct,esc,av}=SOB,narrow=window.matchMedia('(max-width:860px)'),K=['conviction','top','breadth','profit'];
- const S={sort:'top',open:null,all:false},TOP=10;
- const dl=d=>Math.abs(d)<0.5?'no change this week':`<i class="${d>0?'up':'dn'}">${d>0?'▲':'▼'}</i>${Math.abs(d).toFixed(0)} this week`;
+ const S={win:D.wins.includes('7d')?'7d':D.wins[0],sort:'top',open:null,all:false},TOP=10;
+ const WL={'1d':'1D','7d':'7D','30d':'30D'},OV={'1d':'on the day','7d':'this week','30d':'in 30 days'},HD={'1d':'On the day','7d':'This week','30d':'In 30 days'};
+ const dl=d=>d==null?'under 60 days old':Math.abs(d)<0.5?`no change ${OV[S.win]}`:`<i class="${d>0?'up':'dn'}">${d>0?'▲':'▼'}</i>${Math.abs(d).toFixed(0)} ${OV[S.win]}`;
  function fact(k,f){
   if(k==='conviction')return `${f.conviction.toFixed(0)}% of holder supply has sat untouched for 30+ days.`;
   if(k==='top')return Math.abs(f.top_chg)<0.05?'The 50 largest holders were flat this week.':`The 50 largest holders ${f.top_chg>=0?'added':'cut'} ${Math.abs(f.top_chg).toFixed(1)}% this week. The top 10 hold ${f.top10.toFixed(0)}%.`;
@@ -174,23 +184,24 @@ JS = r"""
   return `<li class="${on?'sel':''}"><button type="button" class="row" data-s="${t.s}" aria-pressed="${on}"><span class="n">${i}</span>${av(t.s)}
    <span><span class="tks">${star}${esc(t.s)}</span><span class="sub">${esc(D.names[t.s]||t.s)}</span></span>
    <span class="bar nt"><i style="width:${Math.max(t.score,2).toFixed(0)}%"></i></span>
-   <span class="val">${t.score.toFixed(0)}<small class="dl">${dl(t.d)}</small></span></button>${inl?`<div class="inl">${detail(t)}</div>`:''}</li>`}
+   <span class="val">${t.score.toFixed(0)}<small class="dl">${dl(t.d[S.win])}</small></span></button>${inl?`<div class="inl">${detail(t)}</div>`:''}</li>`}
  function detail(t){
-  const f=t.f,w=SOB.watch.get().includes(t.s);
+  const f=t.f,w=SOB.watch.get().includes(t.s),d=t.d[S.win];
   const parts=K.map(k=>`<div class="pt-r"><div class="pt-t"><span>${D.labels[k]}<small>${D.weights[k]}% of the score</small></span><b>${t.parts[k].toFixed(0)}</b></div><div class="pt-b" role="img" aria-label="${t.parts[k].toFixed(0)} out of 100"><i style="width:${Math.max(t.parts[k],2)}%"></i></div><p>${fact(k,f)}</p></div>`).join('');
   const st=f.stand?`<p class="i-t">Where holders stand against their entry</p><div class="st" role="img" aria-label="Holder supply by distance from entry">${f.stand.map((x,i)=>x>0?`<i class="s${i}" style="flex:${x}" title="${D.stand[i]}: ${x.toFixed(0)}%"></i>`:'').join('')}</div>
    <div class="sk">${f.stand.map((x,i)=>`<span><i class="s${i}"></i>${D.stand[i]}<b>${x.toFixed(0)}%</b></span>`).join('')}</div>
    ${f.avg_pl==null?'':`<p class="i-s">The average holder is ${f.avg_pl>=0?'up':'down'} ${Math.abs(f.avg_pl).toFixed(0)}% on entry.</p>`}`:'';
   return `<div class="i-h">${av(t.s)}<span><b>${esc(t.s)}</b><small>${esc(D.names[t.s]||'')}</small></span><a href="${D.gt}${D.addr[t.s]}" target="_blank" rel="noopener">Chart ↗</a></div>
-   <div class="i-k"><div><span>Holder strength</span><b>${t.score.toFixed(0)}</b></div><div><span>This week</span><b>${Math.abs(t.d)<0.5?'0':(t.d>0?'+':'−')+Math.abs(t.d).toFixed(0)}</b></div><div><span>Price, 7D</span><b>${pct(t.chg)}</b></div></div>
+   <div class="i-k"><div><span>Holder strength</span><b>${t.score.toFixed(0)}</b></div><div><span>${HD[S.win]}</span><b>${d==null?'—':Math.abs(d)<0.5?'0':(d>0?'+':'−')+Math.abs(d).toFixed(0)}</b></div><div><span>Price, ${WL[S.win]}</span><b>${pct(t.chg[S.win])}</b></div></div>
    ${SOB.ascii(t.score)}
-   <p class="i-s">${esc(t.moved)}</p>
+   ${t.moved[S.win]?`<p class="i-s">${esc(t.moved[S.win])}</p>`:''}
    <div class="pt">${parts}</div>${st}
    <div class="det-f"><button type="button" class="wbtn" data-w="${t.s}">${w?'★ On your watchlist':'☆ Watch'}</button><a class="wbtn" href="${D.links.flows}">Flows</a><a class="wbtn" href="${D.links.smart}">Smart money</a></div>`}
  function render(){
-  $('h-h').textContent=D.read.h;$('h-p').innerHTML=D.read.p;
+  const R=D.read[S.win];$('h-h').textContent=R.h;$('h-p').innerHTML=R.p;
+  SOB.seg($('h-win'),D.wins.map(w=>[w,WL[w]]),S.win,v=>{S.win=v;S.all=false;render()});
   SOB.seg($('h-sort'),[['top','Firmest'],['low','Weakest'],['move','Moved most']],S.sort,v=>{S.sort=v;S.all=false;S.open=null;render()});
-  const items=[...D.tokens].sort((a,b)=>S.sort==='top'?b.score-a.score:S.sort==='low'?a.score-b.score:Math.abs(b.d)-Math.abs(a.d));
+  const items=[...D.tokens].sort((a,b)=>S.sort==='top'?b.score-a.score:S.sort==='low'?a.score-b.score:Math.abs(b.d[S.win]||0)-Math.abs(a.d[S.win]||0));
   if(!items.find(t=>t.s===S.open))S.open=items.length&&!narrow.matches?items[0].s:null;
   const shown=S.all?items:items.slice(0,TOP);
   $('h-rows').innerHTML=shown.map((t,i)=>row(t,i+1)).join('')+(items.length>TOP?`<li style="border:0"><button type="button" class="all" data-all="1">${S.all?'Show top '+TOP:'Show all '+items.length}</button></li>`:'');
@@ -226,9 +237,9 @@ def main():
     tmp = sys.argv[2] + ".tmp"
     open(tmp, "w", encoding="utf-8").write(page); os.replace(tmp, sys.argv[2])
     r = read(m)
-    print("holders:", r["h"], f"{len(m['tokens'])} tokens through {m['asof']}")
+    print("holders:", r["h"], f"{len(m['tokens'])} tokens through {m['asof']}; windows {', '.join(m['wins'])}")
     for t in sorted(m["tokens"], key=lambda t: -t["now"]["score"]):
-        print(f"  {t['symbol']:9s} {t['now']['score']:5.1f} (wk {t['week_ago']['score']:5.1f}) | {t['moved']}")
+        print(f"  {t['symbol']:9s} {t['now']['score']:5.1f} (wk {t['week_ago']['score']:5.1f}) | {t['moved']['7d']}")
 
 
 if __name__ == "__main__":

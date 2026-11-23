@@ -1,8 +1,10 @@
 """Smart money: the wallets with the best trading results on Robinhood Chain tokens over a selection window, and what
-they did on the latest day. Built from the flows cache; no extra chain reads.
+they did in the report window after it. Built from the flows cache; no extra chain reads.
 
-Selection window: every cached day before the latest one (up to 29 days). The latest day is kept out of the ranking,
-so "what they bought" is never the reason they were picked.
+Report window: the latest day, or the latest report_days days. Selection window: every cached day before the report
+window (up to 30 days in all). The report window is kept out of the ranking, so "what they bought" is never the
+reason they were picked. A longer report window therefore ranks on fewer days; build() returns None when fewer
+than min_sel days are left to rank on.
 
 Trading result for a wallet in one token over the selection window, counting only tokens it bought in the window:
     realized = min(tokens bought, tokens sold) x (average sell price - average buy price)
@@ -15,6 +17,9 @@ or the trades' USD at the day's average price.
 Smart money: up to 100 wallets with the best total result (at least $500) that traded $5K+ with 3+ trades on 2+
 days, excluding bots (more than
 100 trades a day in a token) and contracts other than smart wallets.
+
+In the report window, bots are left out by the Flows page's own rule for those days, so what the smart wallets did
+plus what everyone else did adds up to the Flows page's all-wallets net.
 
 The book: what those wallets still hold of what they bought since the window opened, the latest day included,
 valued at the latest close. Entry is the average price they paid for it, so "up 12% on entry" is their open result.
@@ -57,7 +62,10 @@ def _qty(r, dec, pbar):
     return (q_net if clean and s == 0 and q_net > 0 else b / pbar), (-q_net if clean and b == 0 and q_net < 0 else s / pbar)
 
 
-def build(cache_dir, n_smart=N_SMART, max_days=30, symbols=None):
+MIN_SEL = 7                      # days of ranking a report window longer than a day needs before it is offered
+
+
+def build(cache_dir, n_smart=N_SMART, max_days=30, symbols=None, report_days=1, min_sel=None):
     toks, codes = [], {}
     cp = os.path.join(cache_dir, "codes.json")
     if os.path.exists(cp):
@@ -82,7 +90,9 @@ def build(cache_dir, n_smart=N_SMART, max_days=30, symbols=None):
     W = W[::-1]
     if len(W) < 3:
         raise SystemExit("smart money: need at least 3 cached days")
-    sel, last = W[:-1], W[-1]
+    if report_days > 1 and len(W) - report_days < (MIN_SEL if min_sel is None else min_sel):
+        return None                                     # not enough days left to rank the wallets on
+    sel, rep, last = W[:-report_days], W[-report_days:], W[-1]
     toks = [t for t in toks if all(d in t["days"] for d in W)]
     W_KINDS = FM.WALLET_KINDS
     wal = collections.defaultdict(lambda: {"vol": 0.0, "n": 0, "pos": collections.defaultdict(lambda: [0.0, 0.0, 0.0, 0.0]),
@@ -115,15 +125,21 @@ def build(cache_dir, n_smart=N_SMART, max_days=30, symbols=None):
     smart = [(a, w) for a, w in ok[:n_smart] if w["res"] >= MIN_RESULT]
     S = {a for a, _ in smart}
     bots = {a for a, w in wal.items() if w["bot"]}
-    # what they did on the latest day
+    # what they did in the report window
     tokens, day_by_wallet = [], collections.defaultdict(collections.Counter)
     for t in toks:
-        day = t["days"][last]
         sm = {"net": 0.0, "bought": 0.0, "sold": 0.0, "buyers": 0, "sellers": 0}
         cr = {"net": 0.0, "bought": 0.0, "sold": 0.0, "buyers": 0, "sellers": 0}
-        for a, r in day["rows"].items():
-            b, s = r[0], r[1]
-            if a in bots:
+        did, kinds = {}, t["head"]["kinds"]
+        for d in rep:
+            for a, r in t["days"][d]["rows"].items():
+                x = did.setdefault(a, [0.0, 0.0, 0])
+                x[0] += r[0]; x[1] += r[1]; x[2] += r[2]
+        for a, (b, s, n) in did.items():
+            # bots are left out by the Flows page's rule for this window, so "they" plus "everyone else" is exactly
+            # the Flows page's all-wallets net for the same token and days
+            per_day = n / len(rep)
+            if per_day > FM.BOT_TRADES_PER_DAY or (kinds.get(a, "eoa") not in W_KINDS and per_day >= 10):
                 continue
             g = sm if a in S else cr
             g["net"] += b - s; g["bought"] += b; g["sold"] += s
@@ -133,26 +149,27 @@ def build(cache_dir, n_smart=N_SMART, max_days=30, symbols=None):
                 g["sellers"] += 1
             if a in S:
                 day_by_wallet[a][t["symbol"]] += b - s
-        po, pc = day["price_open"], day["price_close"]
+        po, pc = t["days"][rep[0]]["price_open"], t["days"][last]["price_close"]
         tokens.append({"symbol": t["symbol"], "name": FM.SHORT.get(t["symbol"]) or t.get("name") or t["symbol"],
                        "category": t["category"], "token": t["token"],
                        "smart": {k: round(v, 2) for k, v in sm.items()}, "crowd": {k: round(v, 2) for k, v in cr.items()},
                        "chg": round((pc / po - 1) * 100, 2) if po and pc else None})
-    # the book: what they still hold of what they bought since the window opened, latest day included
+    # the book: what they still hold of what they bought since the window opened, the report window included
     crowd_net = {x["symbol"]: x["crowd"]["net"] for x in tokens}
     for x in tokens:
         t = next(t for t in toks if t["symbol"] == x["symbol"])
         sym, dec = t["symbol"], 10 ** t["decimals"]
-        day = t["days"][last]
-        P = day["price_close"] or 0
-        pbar = _avg(day["price_open"], day["price_close"])
+        P = t["days"][last]["price_close"] or 0
         held = []
         for a, w in smart:
             b, _s, qb, qs = w["pos"].get(sym, (0.0, 0.0, 0.0, 0.0))
-            r = day["rows"].get(a)
-            if r and pbar:
-                q1, q2 = _qty(r, dec, pbar)
-                b += r[0]; qb += q1; qs += q2
+            for d in rep:
+                day = t["days"][d]
+                pbar = _avg(day["price_open"], day["price_close"])
+                r = day["rows"].get(a)
+                if r and pbar:
+                    q1, q2 = _qty(r, dec, pbar)
+                    b += r[0]; qb += q1; qs += q2
             open_q = qb - qs
             if open_q > 0 and qb > 0 and open_q * P >= BOOK_MIN_USD:
                 held.append((a, open_q * P, b / qb, open_q))
@@ -174,6 +191,7 @@ def build(cache_dir, n_smart=N_SMART, max_days=30, symbols=None):
                       "day_net": round(sum(dmov.values()), 2), "day_top": top[0], "day_top_net": round(top[1], 2)})
     active = sum(1 for a in S if a in day_by_wallet)
     return {"asof": asof, "sel": {"from": sel[0], "to": sel[-1]}, "day": last, "n_smart": len(S), "active": active,
+            "rep": {"from": rep[0], "to": last, "days": len(rep)},
             "eligible": len(ok), "criteria": {"min_vol": MIN_VOL, "min_trades": MIN_TRADES, "min_days": MIN_DAYS},
             "total_res": round(sum(w["res"] for _, w in smart), 2), "total_vol": round(sum(w["vol"] for _, w in smart), 2),
             "cats": [{"id": c, "label": l} for c, l in FM.CATS], "tokens": tokens, "board": board,

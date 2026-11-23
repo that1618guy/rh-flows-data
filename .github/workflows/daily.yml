@@ -145,6 +145,13 @@ jobs:
         continue-on-error: true
         run: python scripts/revenue_multiple.py data/flows_cache/valuation.json
 
+      - name: "Alerts: post to Discord"
+        if: ${{ !inputs.catchup }}
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scripts/post_alerts.py data/flows_cache
+
       - name: "Flows: save the chain cache"
         if: always()
         uses: actions/cache/save@v4
