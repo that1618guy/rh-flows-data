@@ -39,10 +39,13 @@ def fill_kinds(st):
 def model(cache_dir):
     sdir = os.path.join(cache_dir, "holders")
     meta = json.load(open(os.path.join(cache_dir, "tokens_meta.json")))
-    toks, left = [], {"thin": [], "unpriced": [], "unbuildable": []}
+    toks, left = [], {"thin": [], "unpriced": [], "unbuildable": [], "passed": []}
+    passed = IN.passed_through_in(cache_dir)
     for p in sorted(glob.glob(os.path.join(sdir, "*.state.json.gz"))):
         st = HM.load(p)
         sym = st["symbol"]
+        if sym in passed:
+            left["passed"].append(sym); continue
         if (meta.get(sym) or {}).get("liq", 0) < IN.MIN_LIQ:
             left["thin"].append(sym); continue
         if not st.get("rebuildable", True):
@@ -96,6 +99,7 @@ def view(m, href=lambda i: f"/{i}"):
             "gt": "https://www.geckoterminal.com/robinhood/tokens/", "links": {"flows": href("flows"), "smart": href("smart-money")}}
     lo = m["left"]
     out = [x for x in (f"thin liquidity: {', '.join(lo['thin'])}" if lo["thin"] else "",
+                       f"{IN.PASS_NOTE}: {', '.join(lo['passed'])}" if lo.get("passed") else "",
                        f"too few daily prices: {', '.join(lo['unpriced'])}" if lo["unpriced"] else "",
                        f"can't be rebuilt from transfers: {', '.join(lo['unbuildable'])}" if lo["unbuildable"] else "",
                        f"waiting on a day of data: {', '.join(lo['stale'])}" if lo["stale"] else "") if x]

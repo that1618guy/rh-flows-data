@@ -16,6 +16,8 @@ WEIGHTS = {"capital": 0.40, "buying": 0.35, "wallets": 0.25}
 LABELS = {"capital": "Capital onto the chain", "buying": "Buying of RH tokens", "wallets": "New wallets"}
 SCALES = {"capital": (-3.0, 3.0), "buying": (45.0, 55.0), "wallets": (-50.0, 50.0)}
 MIN_LIQ = 50_000                 # tokens with less pool liquidity than this are left out of every token view
+PASS_MAX = 80.0                  # and so are tokens with this % of their volume passed through wallets that kept none
+PASS_NOTE = f"{PASS_MAX:.0f}%+ of volume passed through wallets that held none before and none after"
 MIN_FIRST_USD = 10.0
 WALLET_KINDS = {"eoa", "7702", "c62", "c46"}
 IN, OUT = 60, 40
@@ -23,6 +25,31 @@ IN, OUT = 60, 40
 
 def lin(x, lo, hi):
     return max(0.0, min(100.0, (x - lo) / (hi - lo) * 100))
+
+
+def pass_share(flows):
+    """{symbol: % of the token's wallet volume that came from wallets holding none of it before the window and none
+    after}, for crypto tokens, over 7 days (flows_model's pass-through share)."""
+    wid = "7d" if "7d" in flows["windows"] else "1d"
+    return {t["symbol"]: t["w"][wid].get("passthrough") or 0.0 for t in flows["tokens"] if t["category"] != "stocks"}
+
+
+def passed_through(flows):
+    """Symbols whose trading isn't demand: nearly all of the volume comes from wallets that held none of the token
+    before the window and none after. That is tokens being walked through throwaway wallets, so the volume, the
+    net flow and the "new wallets" mean nothing. Every token view leaves these out, whatever their liquidity
+    reads that day."""
+    return {s for s, p in pass_share(flows).items() if p >= PASS_MAX}
+
+
+def passed_through_in(cache_dir):
+    """passed_through() for a builder that doesn't build the flows model itself. Empty if the flows cache can't be read."""
+    try:
+        import flows_model as FM
+        return passed_through(FM.build(cache_dir))
+    except (Exception, SystemExit) as e:
+        print(f"inflow: couldn't check pass-through volume ({e})")
+        return set()
 
 
 def _prev(d, n=1):

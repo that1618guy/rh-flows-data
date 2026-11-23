@@ -23,9 +23,10 @@ AGAINST_MIN = 1_000
 
 def model(cache_dir):
     meta = json.load(open(os.path.join(cache_dir, "tokens_meta.json")))
-    syms = {s for s, x in meta.items() if x.get("liq", 0) >= IN.MIN_LIQ}
+    passed = IN.passed_through_in(cache_dir)
+    syms = {s for s, x in meta.items() if x.get("liq", 0) >= IN.MIN_LIQ and s not in passed}
     m = SM.build(cache_dir, symbols=syms)
-    m["meta"] = meta
+    m["meta"] = meta; m["passed"] = sorted(passed)
     return m
 
 
@@ -72,6 +73,7 @@ def view(m, href=lambda i: f"/{i}"):
             "names": {s: x["name"] for s, x in m["meta"].items()}, "addr": {s: x["address"] for s, x in m["meta"].items()},
             "gt": "https://www.geckoterminal.com/robinhood/tokens/", "links": {"flows": href("flows"), "holders": href("holders")}}
     c = m["criteria"]
+    left = f" Left out with {IN.PASS_NOTE}: {', '.join(m['passed'])}." if m.get("passed") else ""
     body = f"""
 <section class="pg-head">
 <p class="eyebrow">Smart money · {dshort(m['day'])}</p>
@@ -102,7 +104,7 @@ def view(m, href=lambda i: f"/{i}"):
 <dt>Who counts</dt><dd>Up to {SM.N_SMART} wallets with the best trading result over every day we have before the latest one (up to 29). Each needs ${SM.MIN_RESULT}+ of result, ${c['min_vol']:,}+ traded, and {c['min_trades']}+ trades on {c['min_days']}+ days. Bots and contracts are left out. The latest day is kept out of the ranking, so what they bought is never the reason they were picked.</dd>
 <dt>Trading result</dt><dd>Only on tokens a wallet bought inside the window: what it bought and sold, at the average sell price less the average buy price, plus what it still holds, marked to the last close. Selling old holdings or tokens it was sent never counts as profit.</dd>
 <dt>The book</dt><dd>What those wallets still hold of what they bought since the window opened, at the latest close. Positions under ${SM.BOOK_MIN_USD} aren't counted. On entry is the latest price against the average price they paid.</dd>
-<dt>Included</dt><dd>Crypto tokens on Robinhood Chain with $50K+ of pool liquidity. Stock tokens have their own page.</dd>
+<dt>Included</dt><dd>Crypto tokens on Robinhood Chain with $50K+ of pool liquidity.{left} Stock tokens have their own page.</dd>
 </dl></details>
 """
     return {"id": "smart-money", "title": "Smart money", "desc": "What the most profitable wallets on Robinhood Chain hold and trade.",

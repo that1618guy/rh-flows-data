@@ -1,6 +1,7 @@
 """The Flows page: who is buying and selling each Robinhood Chain token, and which flows stand out.
 
-Crypto tokens only (stock tokens have their own page), and only tokens with $50K+ of pool liquidity. Net = USD
+Crypto tokens only (stock tokens have their own page), and only tokens with $50K+ of pool liquidity whose volume
+isn't passed through throwaway wallets (inflow.passed_through). Net = USD
 bought less USD sold by wallets in the token's main pools; bots are shown apart. One ranked list (bought or sold),
 ten rows with the rest behind a button, and the picked token's detail beside it. A token with no net flow for the
 chosen wallet group isn't listed.
@@ -111,7 +112,9 @@ def read(T, wid, win, sizes):
 def model(cache_dir):
     flows = FM.build(cache_dir)
     meta = json.load(open(os.path.join(cache_dir, "tokens_meta.json")))
-    T = [t for t in flows["tokens"] if t["category"] != "stocks" and (meta.get(t["symbol"]) or {}).get("liq", 0) >= IN.MIN_LIQ]
+    passed = IN.passed_through(flows)
+    T = [t for t in flows["tokens"] if t["category"] != "stocks" and t["symbol"] not in passed
+         and (meta.get(t["symbol"]) or {}).get("liq", 0) >= IN.MIN_LIQ]
     sizes = {t["symbol"]: TM.size(meta[t["symbol"]]) for t in T}
     wins = {}
     for wid, w in flows["windows"].items():
@@ -146,7 +149,9 @@ def model(cache_dir):
     return {"asof": flows["asof"], "windows": wins, "tokens": toks, "cohorts": cohorts, "meta": meta,
             "read": {wid: read(T, wid, flows["windows"][wid], sizes) for wid in wins},
             "look": {wid: [{"s": s, "label": l, "text": x} for _, _, s, l, x in sorted(v, reverse=True)[:3]] for wid, v in look.items()},
-            "left_out": sorted(t["symbol"] for t in flows["tokens"] if t["category"] != "stocks" and t not in T),
+            "left_out": sorted(t["symbol"] for t in flows["tokens"]
+                               if t["category"] != "stocks" and t not in T and t["symbol"] not in passed),
+            "passed": sorted(passed), "pass_share": IN.pass_share(flows),
             "stale": flows["stale"], "unpriced": [x for x in flows["unpriced"] if x in meta], "incomplete": flows["incomplete"]}
 
 
@@ -160,6 +165,8 @@ def view(m, href=lambda i: f"/{i}"):
     data["names"] = {s: x["name"] for s, x in m["meta"].items()}
     data["links"] = {"smart": href("smart-money"), "holders": href("holders")}
     left = f" Left out for thin liquidity: {', '.join(m['left_out'])}." if m["left_out"] else ""
+    if m["passed"]:
+        left += f" Left out with {IN.PASS_NOTE}: {', '.join(m['passed'])}."
     if m["unpriced"]:
         left += f" No recent price: {', '.join(m['unpriced'])}."
     body = f"""
@@ -313,6 +320,10 @@ def main():
     open(tmp, "w", encoding="utf-8").write(page); os.replace(tmp, out)
     r = m["read"]["7d" if "7d" in m["read"] else "1d"]
     print(f"flows: {len(m['tokens'])} tokens through {m['asof']}. {r['h']}")
+    ps = m["pass_share"]; kept = [s for s in ps if s not in m["passed"]]
+    top = max(kept, key=ps.get) if kept else None
+    print("flows: pass-through volume: " + (", ".join(f"{s} {ps[s]:.0f}% (left out)" for s in m["passed"]) or "none left out")
+          + (f"; highest kept {top} {ps[top]:.0f}%" if top else ""))
 
 
 if __name__ == "__main__":

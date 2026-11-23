@@ -21,8 +21,11 @@ TOP = 5
 
 
 def shown_tokens(flows, meta):
-    """Crypto tokens with enough liquidity to mean something. Stock tokens have their own page."""
-    return [t for t in flows["tokens"] if t["category"] != "stocks" and (meta.get(t["symbol"]) or {}).get("liq", 0) >= IN.MIN_LIQ]
+    """Crypto tokens with enough liquidity to mean something, whose volume isn't passed through throwaway wallets.
+    Stock tokens have their own page."""
+    out = IN.passed_through(flows)
+    return [t for t in flows["tokens"] if t["category"] != "stocks" and t["symbol"] not in out
+            and (meta.get(t["symbol"]) or {}).get("liq", 0) >= IN.MIN_LIQ]
 
 
 def token_index(states_dir, symbols):
@@ -284,7 +287,7 @@ def view(m, href=lambda i: f"/{i}"):
 <details class="how"><summary>How this is measured</summary><dl>
 <dt>Net capital flow</dt><dd>Stablecoins (USDG, USDe, syrupUSDG) minted on Robinhood Chain less burned, read from the chain, plus the change in ETH held by the chain's bridge on Ethereum, valued at that day's ETH price. Every ETH on the chain is backed by ETH in that bridge, whichever bridge a user took.</dd>
 <dt>Inflow score</dt><dd>0 to 100 on fixed scales, 50 is balanced. Capital onto the chain (40%): 7-day net flow as a share of capital already there, −3% scores 0 and +3% scores 100. Buying of RH tokens (35%): the share of wallet volume that was buying, 45% scores 0 and 55% scores 100. New wallets (25%): first positions of $10+ this week against a typical week this month, −50% scores 0 and +50% scores 100.</dd>
-<dt>Where it went</dt><dd>USD bought less USD sold by wallets in each token's main pools. Bots are left out, and so are tokens with under $50K of liquidity. Stock tokens have their own page.</dd>
+<dt>Where it went</dt><dd>USD bought less USD sold by wallets in each token's main pools. Bots are left out, and so are tokens with under $50K of liquidity or with {IN.PASS_NOTE}. Stock tokens have their own page.</dd>
 <dt>Sources</dt><dd>Robinhood Chain (stablecoins, trades, holders), DefiLlama (bridge ETH, TVL, volume, fees), GeckoTerminal (prices).</dd>
 </dl></details>
 """
