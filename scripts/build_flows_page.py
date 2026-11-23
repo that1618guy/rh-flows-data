@@ -179,7 +179,7 @@ def view(m, href=lambda i: f"/{i}"):
         left += f" No recent price: {', '.join(m['unpriced'])}."
     body = f"""
 <section class="pg-head">
-<p class="eyebrow">Flows · <span id="f-when"></span></p>
+<p class="eyebrow">Flows · <span id="f-when"></span> <span class="nb">· updated daily</span></p>
 <h1 id="f-h"></h1>
 <p class="lede" id="f-p"></p>
 <div class="ctl pg-ctl"><div class="seg" id="f-win" role="group" aria-label="Window"></div><div class="seg" id="f-grp" role="group" aria-label="Wallet size"></div><button type="button" class="chip" id="f-watch" hidden></button></div>

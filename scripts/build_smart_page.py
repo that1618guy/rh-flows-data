@@ -76,7 +76,7 @@ def view(m, href=lambda i: f"/{i}"):
     left = f" Left out with {IN.PASS_NOTE}: {', '.join(m['passed'])}." if m.get("passed") else ""
     body = f"""
 <section class="pg-head">
-<p class="eyebrow">Smart money · {dshort(m['day'])}</p>
+<p class="eyebrow">Smart money · {dshort(m['day'])} <span class="nb">· updated daily</span></p>
 <h1 id="s-h"></h1>
 <p class="lede" id="s-p"></p>
 </section>

@@ -106,7 +106,7 @@ def view(m, href=lambda i: f"/{i}"):
     left = f" Left out today ({'; '.join(out)})." if out else ""
     body = f"""
 <section class="pg-head">
-<p class="eyebrow">Holders · through {dshort(m['asof'])}</p>
+<p class="eyebrow">Holders · through {dshort(m['asof'])} <span class="nb">· updated daily</span></p>
 <h1 id="h-h"></h1>
 <p class="lede" id="h-p"></p>
 </section>

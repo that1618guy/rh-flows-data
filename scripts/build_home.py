@@ -299,7 +299,7 @@ def view(m, href=lambda i: f"/{i}"):
     body = f"""
 <section class="herocard" aria-label="Overview">
 <div class="art" aria-hidden="true" data-speed="{speed:.2f}"><pre class="cur"></pre><pre class="shp"></pre></div>
-<div class="hc"><p class="kicker">State of Robinhood Chain · 7 days to {dshort(m['asof'])}</p>
+<div class="hc"><p class="kicker">State of Robinhood Chain · 7 days to {dshort(m['asof'])} <span class="nb">· updated daily</span></p>
 <h1>{headline(m)}</h1>
 <p class="lede">{lede(m)}</p></div>
 <div class="lower">{meter(m)}<div class="strip">{cells(m)}</div></div>
