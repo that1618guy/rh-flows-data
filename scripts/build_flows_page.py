@@ -26,6 +26,7 @@ SPLIT_OPP = 0.25               # the crowd must take at least this share of the 
 DIVERGE_NET = 0.10             # net flow, % of market cap, to flag a flow going against the price
 DIVERGE_PX = 5.0               # price move, %, in the opposite direction
 STREAK = 4                     # days in a row
+TURN_USD = 10_000              # the latest day's net, against the window's direction, that earns a line in the read
 FRESH_N, FRESH_SHARE = 15, 0.5  # new wallets, and their share of the net buying
 GROUPS = ["whale", "big", "mid", "small"]
 GLABEL = {"all": "All wallets", "whale": "Whales", "big": "Big", "mid": "Mid", "small": "Small"}
@@ -86,8 +87,8 @@ def tags(w, size, run):
 RANK = {"split": 3, "weak": 3, "strong": 3, "fresh": 2, "run": 1}      # what leads "Worth a look"
 
 
-def read(T, wid, win, sizes):
-    """Headline and at most three sentences for one window."""
+def read(T, wid, win, sizes, day=None):
+    """Headline and at most three sentences for one window. day is the latest day's window, for the longer ones."""
     N = len(T)
     g = {k: sum(t["w"][wid][k]["net"] for t in T) for k in GROUPS}
     tot = sum(g.values())
@@ -105,7 +106,14 @@ def read(T, wid, win, sizes):
             p += f", while {GLONG[opp].lower()} {'bought' if g[opp] > 0 else 'sold'} {fm(g[opp])}"
         p += "."
     up = sum(1 for t in T if t["w"][wid]["all"]["net"] > 1)
-    p += f" {up} of {N} tokens were net bought."
+    turn = ""
+    if wid != "1d" and day:                      # the latest day went against the window: say so, it's the news
+        d_tot = sum(t["w"]["1d"]["all"]["net"] for t in T)
+        d_up = sum(1 for t in T if t["w"]["1d"]["all"]["net"] > 1)
+        if d_tot * tot < 0 and abs(d_tot) > TURN_USD:
+            turn = (f" {dshort(day['to'])} went the other way: wallets net {'bought' if d_tot > 0 else 'sold'} "
+                    f"<b>{fm(d_tot)}</b>, with {d_up} of {N} tokens net bought.")
+    p += turn or f" {up} of {N} tokens were net bought."
     return {"h": h, "p": p}
 
 
@@ -147,7 +155,7 @@ def model(cache_dir):
         c["bots"] = {"n": sum(t["w"][wid]["bots"]["wallets"] for t in T), "net": round(sum(t["w"][wid]["bots"]["net"] for t in T))}
         cohorts[wid] = c
     return {"asof": flows["asof"], "windows": wins, "tokens": toks, "cohorts": cohorts, "meta": meta,
-            "read": {wid: read(T, wid, flows["windows"][wid], sizes) for wid in wins},
+            "read": {wid: read(T, wid, flows["windows"][wid], sizes, flows["windows"].get("1d")) for wid in wins},
             "look": {wid: [{"s": s, "label": l, "text": x} for _, _, s, l, x in sorted(v, reverse=True)[:3]] for wid, v in look.items()},
             "left_out": sorted(t["symbol"] for t in flows["tokens"]
                                if t["category"] != "stocks" and t not in T and t["symbol"] not in passed),
@@ -265,17 +273,17 @@ JS = r"""
   const T=D.tokens.filter(t=>!S.watch||wl.includes(t.s));
   const buy=T.filter(t=>net(t)>1).sort((a,b)=>net(b)-net(a)),sell=T.filter(t=>net(t)<-1).sort((a,b)=>net(a)-net(b));
   const sb=buy.reduce((a,t)=>a+net(t),0),ss=sell.reduce((a,t)=>a+net(t),0);
-  if(!S.side)S.side=(-ss>sb)?'sell':'buy';
-  if(S.side==='buy'&&!buy.length&&sell.length)S.side='sell';
-  if(S.side==='sell'&&!sell.length&&buy.length)S.side='buy';
-  SOB.seg($('f-side'),[['buy',`Bought · ${buy.length}`],['sell',`Sold · ${sell.length}`]],S.side,v=>{S.side=v;S.all=false;S.open=null;render()});
-  const items=S.side==='buy'?buy:sell,who=S.grp==='all'?'wallets':S.grp==='whale'?'whales':D.glong[S.grp].toLowerCase();
-  $('f-sum').textContent=items.length?`${signed(S.side==='buy'?sb:ss)} by ${who}${S.grp==='all'?'':' ('+D.ranges[S.grp]+')'}`:'';
+  if(!S.side){S.side=(-ss>sb)?'sell':'buy';S.stay=false}
+  if(!S.stay&&S.side==='buy'&&!buy.length&&sell.length)S.side='sell';
+  if(!S.stay&&S.side==='sell'&&!sell.length&&buy.length)S.side='buy';
+  SOB.seg($('f-side'),[['buy',`Bought · ${buy.length}`],['sell',`Sold · ${sell.length}`]],S.side,v=>{S.side=v;S.stay=true;S.all=false;S.open=null;render()});
+  const items=S.side==='buy'?buy:sell,who=S.grp==='all'?'all wallets':S.grp==='whale'?'whales':D.glong[S.grp].toLowerCase();
+  $('f-sum').textContent=(items.length?`${signed(S.side==='buy'?sb:ss)} by ${who}${S.grp==='all'?'':' ('+D.ranges[S.grp]+')'}`:`By ${who}`)+` · ${W.label}`;
   if(!items.find(t=>t.s===S.open))S.open=items.length&&!narrow.matches?items[0].s:null;
   if(S.open&&items.findIndex(t=>t.s===S.open)>=TOP)S.all=true;
   const max=items.length?Math.max(...items.map(t=>Math.abs(net(t)))):1,shown=S.all?items:items.slice(0,TOP);
   $('f-rows').innerHTML=items.length?shown.map((t,i)=>row(t,i+1,max)).join('')+(items.length>TOP?`<li style="border:0"><button type="button" class="all" data-all="1">${S.all?'Show top '+TOP:'Show all '+items.length}</button></li>`:'')
-   :`<li class="empty">No token was net ${S.side==='buy'?'bought':'sold'} by ${who} in this window.</li>`;
+   :`<li class="empty">No token was net ${S.side==='buy'?'bought':'sold'} by ${who} in this window. Try another window or wallet size at the top of the page.</li>`;
   const insp=$('f-insp'),t=D.tokens.find(t=>t.s===S.open);
   insp.innerHTML=t?detail(t):'<p class="empty">Pick a token to see who is behind its flow.</p>';
   const L=D.look[S.win]||[];$('f-look-sec').hidden=!L.length;
