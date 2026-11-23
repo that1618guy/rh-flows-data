@@ -1,8 +1,8 @@
 {
- "built": "2026-11-22T08:12:33Z",
+ "built": "2026-11-23T08:51:36Z",
  "pages": {
   "flows.html": {
-   "asof": "2026-11-21",
+   "asof": "2026-11-22",
    "tokens": 32,
    "windows": [
     "1d",
@@ -10,7 +10,7 @@
    ]
   },
   "holders.html": {
-   "asof": "2026-11-21",
+   "asof": "2026-11-22",
    "tokens": 18,
    "not_shown": [],
    "not_scored": [
@@ -18,13 +18,13 @@
    ]
   },
   "smart.html": {
-   "asof": "2026-11-21",
-   "day": "2026-11-21",
-   "wallets": 72,
+   "asof": "2026-11-22",
+   "day": "2026-11-22",
+   "wallets": 100,
    "tokens": 32
   },
   "valuation.html": {
-   "asof": "2026-11-21",
+   "asof": "2026-11-22",
    "projects": 12
   }
  },
