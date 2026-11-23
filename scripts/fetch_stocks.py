@@ -640,7 +640,7 @@ def stage_assemble(cutoff):
     tracked = set(g.get("tracked") or [])
     vol = {p: s for p, s in g.get("vol", {}).items() if not tracked or p in tracked}
     pool_rows, daily = [], [0.0] * len(V)
-    by_tok = {}
+    by_tok, by_tok7 = {}, {}                   # each token's DEX volume over 30 days, and over the last 7 (the economy read)
     for addr, p in pools.items():
         if addr not in vol:
             continue
@@ -650,6 +650,7 @@ def stage_assemble(cutoff):
         sides = [s for s in (p["base"], p["quote"]) if s in stock]
         for s in sides:
             by_tok[s] = by_tok.get(s, 0.0) + v30
+            by_tok7[s] = by_tok7.get(s, 0.0) + sum(dv[-7:])
         other = p["quote"] if p["base"] in stock and p["quote"] not in stock else p["base"]
         osym = (p["quote_sym"] if other == p["quote"] else p["base_sym"]) or ""
         if len(sides) == 2:
@@ -668,6 +669,7 @@ def stage_assemble(cutoff):
                           "vol24": p["vol24"], "reserve": p["reserve"], "created": p["created"]})
     for r in rows:
         r["vol30"] = by_tok.get(r["address"], 0.0)
+        r["vol7"] = by_tok7.get(r["address"], 0.0)
     pool_rows.sort(key=lambda r: -r["vol30"])
     # launchpads: pools whose other side is a stock token
     lps = {}
