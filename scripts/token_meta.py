@@ -81,6 +81,7 @@ def save_logos(meta, logos_dir, web_path="/logos/"):
             continue
         ext = _kind(raw)
         if not ext or not 200 <= len(raw) <= 2_000_000:
+            m["img"] = None            # not a usable image (e.g. a blank 87-byte PNG): the page shows the first letter
             continue
         tmp = os.path.join(logos_dir, key + ".tmp")
         open(tmp, "wb").write(raw); os.replace(tmp, os.path.join(logos_dir, key + ext))
