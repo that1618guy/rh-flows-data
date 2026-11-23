@@ -134,7 +134,8 @@ jobs:
 
   # After the run the Worker chain started: if today's set isn't out (act is mark, or the step never got that far) or
   # capital stopped short of yesterday (DefiLlama's bridge figure for the day wasn't out yet), wait 2 hours, then
-  # start a catch-up Flows run and Site data again. Neither of those starts another retry.
+  # start a catch-up Flows run and Site data again. Neither of those starts another retry, and there is at most one
+  # catch-up a day (UTC).
   retry:
     needs: fetch
     if: always() && github.event_name == 'workflow_run' && needs.fetch.result != 'skipped'
@@ -150,6 +151,14 @@ jobs:
           ACT: ${{ needs.fetch.outputs.act }}
         run: |
           want=$(date -u -d yesterday +%F)
+          # Second stop, apart from the catch-up run's name: once a catch-up Flows run has started today (UTC), no
+          # more. It counts a run named "Flows data, catch-up", or any Flows run started by this workflow's own token.
+          caught_up() {
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/daily.yml/runs?event=workflow_dispatch&created=%3E%3D$(date -u +%F)&per_page=100" \
+              --jq '[.workflow_runs[] | select(.display_title == "Flows data, catch-up" or .triggering_actor.login == "github-actions[bot]")] | length'
+          }
+          n=$(caught_up)
+          if [ "$n" != 0 ]; then echo "a catch-up Flows run already started today ($n): no retry"; exit 0; fi
           cap=$(gh api "repos/$GITHUB_REPOSITORY/contents/docs/status.json?ref=main" --jq .content | base64 -d \
                 | python3 -c "import json,sys;print((json.load(sys.stdin).get('capital') or {}).get('through') or '')" || true)
           echo "site data: ${ACT:-no result}; capital through: ${cap:-unknown}; want $want"
@@ -159,6 +168,8 @@ jobs:
           if [ -z "$why" ]; then echo "nothing to retry"; exit 0; fi
           echo "::warning title=Site data::$why; retrying at $(date -u -d '+2 hours' +%H:%M) UTC"
           sleep 7200
+          n=$(caught_up)
+          if [ "$n" != 0 ]; then echo "a catch-up Flows run started while waiting ($n): no retry"; exit 0; fi
           gh workflow run daily.yml -R "$GITHUB_REPOSITORY" --ref main -f catchup=true
           gh workflow run site-data.yml -R "$GITHUB_REPOSITORY" --ref main
           echo "started a catch-up Flows run and Site data"
