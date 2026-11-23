@@ -5,23 +5,33 @@ name: Site data
 # Published at docs/site-data/ on the Pages site only when every step succeeds, so the files there are always one
 # consistent set, and only once DefiLlama has the previous UTC day (the cutoff); until then the last set stays. The set and the stock cache are release assets (release "site-data"), replaced on each run, so neither
 # grows the git history; pages.yml deploys the set to Pages.
+#
+# Started by Flows data finishing (which the Worker starts at 00:45 UTC), so it doesn't wait on GitHub's schedule. If
+# the set isn't out, or capital stopped a day short, the retry job waits 2 hours, then starts a catch-up Flows run
+# (capital and the home page) and this workflow again. Once only. The two schedules stay on as the backup.
 on:
+  workflow_run:
+    workflows: ["Flows data"]
+    types: [completed]
   schedule:
-    - cron: "30 1 * * *"      # as early as the data allows: the cutoff is the previous UTC day, closed at 00:00
-    - cron: "30 4 * * *"      # retry: a failed run, or DefiLlama not having the previous day yet, tries again here
+    - cron: "30 1 * * *"      # backup: GitHub's schedule can fire hours late or not at all
+    - cron: "30 4 * * *"      # backup retry
   workflow_dispatch:
 
 permissions:
   contents: write             # to replace the release assets
 
-concurrency:
-  group: site-data
-  cancel-in-progress: false
-
 jobs:
   fetch:
+    # a catch-up Flows run doesn't start this: the retry below starts it directly
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.display_title != 'Flows data, catch-up'
     runs-on: ubuntu-latest
     timeout-minutes: 75
+    concurrency:
+      group: site-data
+      cancel-in-progress: false
+    outputs:
+      act: ${{ steps.publish.outputs.act }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,6 +74,7 @@ jobs:
           python scripts/fetch_economies.py
 
       - name: Publish the set and the stock cache
+        id: publish
         if: always()
         env:
           OK: ${{ steps.fetch.outcome == 'success' && steps.fetch.outputs.ready == 'true' }}
@@ -107,6 +118,7 @@ jobs:
           print(act, json.dumps({k: v for k, v in st.items() if k != "files"}, indent=1))
           PY
           act=$(cat "$RUNNER_TEMP/act")
+          echo "act=$act" >> "$GITHUB_OUTPUT"
           if [ "$act" != keep ] && [ -f "$out/status.json" ]; then
             tar -czf "$RUNNER_TEMP/site-data.tar.gz" -C "$out" .
             gh release upload site-data "$RUNNER_TEMP/site-data.tar.gz" --clobber
@@ -116,9 +128,40 @@ jobs:
             gh release upload site-data "$RUNNER_TEMP/stocks-cache.tar.gz" --clobber
           fi
 
+  # After the run the Worker chain started: if today's set isn't out (act is mark, or the step never got that far) or
+  # capital stopped short of yesterday (DefiLlama's bridge figure for the day wasn't out yet), wait 2 hours, then
+  # start a catch-up Flows run and Site data again. Neither of those starts another retry.
+  retry:
+    needs: fetch
+    if: always() && github.event_name == 'workflow_run' && needs.fetch.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 140
+    permissions:
+      actions: write          # to start the two runs
+      contents: read
+    steps:
+      - name: Wait 2 hours and start the catch-up, if needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACT: ${{ needs.fetch.outputs.act }}
+        run: |
+          want=$(date -u -d yesterday +%F)
+          cap=$(gh api "repos/$GITHUB_REPOSITORY/contents/docs/status.json?ref=main" --jq .content | base64 -d \
+                | python3 -c "import json,sys;print((json.load(sys.stdin).get('capital') or {}).get('through') or '')" || true)
+          echo "site data: ${ACT:-no result}; capital through: ${cap:-unknown}; want $want"
+          why=""
+          [ "$ACT" = publish ] || [ "$ACT" = keep ] || why="site data not out"
+          [ -n "$cap" ] && [ "$cap" \< "$want" ] && why="${why:+$why, }capital through $cap"
+          if [ -z "$why" ]; then echo "nothing to retry"; exit 0; fi
+          echo "::warning title=Site data::$why; retrying at $(date -u -d '+2 hours' +%H:%M) UTC"
+          sleep 7200
+          gh workflow run daily.yml -R "$GITHUB_REPOSITORY" --ref main -f catchup=true
+          gh workflow run site-data.yml -R "$GITHUB_REPOSITORY" --ref main
+          echo "started a catch-up Flows run and Site data"
+
   pages:
     needs: fetch
-    if: always()
+    if: always() && needs.fetch.result != 'skipped'
     uses: ./.github/workflows/pages.yml
     permissions:
       contents: read

@@ -3,10 +3,19 @@ name: Flows data
 # Reads Robinhood Chain once a day and publishes to docs/ (GitHub Pages; pages.yml deploys it): the home, Flows,
 # Smart money and Holders pages (home.html, flows.html, smart.html, holders.html), the token logos (logos/), the
 # revenue multiple's data for the Projects page (valuation.json), and status.json.
+# Started at 00:45 UTC by the sob-rh-trigger Cloudflare Worker (GitHub's own schedule can run hours late, so it is only
+# the backup). When it finishes, site-data.yml starts. A catch-up run (started by site-data.yml 2 hours later when
+# capital or the site data came up a day short) reads capital again and rebuilds the home page, nothing else.
+run-name: ${{ inputs.catchup && 'Flows data, catch-up' || 'Flows data' }}
 on:
   schedule:
-    - cron: "40 0 * * *"      # 00:40 UTC: the previous UTC day is complete
-  workflow_dispatch:          # run it by hand from the Actions tab
+    - cron: "40 0 * * *"      # backup only: the Worker starts the run at 00:45 UTC
+  workflow_dispatch:          # the Worker, or by hand from the Actions tab
+    inputs:
+      catchup:
+        description: "Catch-up: read capital again and rebuild the home page only"
+        type: boolean
+        default: false
 
 permissions:
   contents: write             # to commit docs/
@@ -62,6 +71,7 @@ jobs:
           PY
 
       - name: "Flows: read the chain"
+        if: ${{ !inputs.catchup }}
         id: read
         continue-on-error: true
         timeout-minutes: 60
@@ -80,6 +90,7 @@ jobs:
             || echo "::warning title=Capital::no capital-seed release"
 
       - name: "Token facts and logos"
+        if: ${{ !inputs.catchup }}
         id: meta
         continue-on-error: true
         run: python scripts/token_meta.py data/flows_universe.json data/flows_cache/tokens_meta.json data/flows_cache/logos
@@ -100,6 +111,7 @@ jobs:
             || echo "::warning title=Holders::no holder states in the cache-seed release"
 
       - name: "Holders: roll forward"
+        if: ${{ !inputs.catchup }}
         id: roll
         continue-on-error: true
         run: for f in data/flows_cache/holders/*.state.json.gz; do python scripts/holders_state.py roll "$f" data/flows_cache; done
@@ -110,21 +122,25 @@ jobs:
         run: python scripts/build_home.py data/flows_cache data/flows_cache/home.html
 
       - name: "Page: flows"
+        if: ${{ !inputs.catchup }}
         id: flows
         continue-on-error: true
         run: python scripts/build_flows_page.py data/flows_cache data/flows_cache/page.html
 
       - name: "Page: smart money"
+        if: ${{ !inputs.catchup }}
         id: smart
         continue-on-error: true
         run: python scripts/build_smart_page.py data/flows_cache data/flows_cache/smart.html
 
       - name: "Page: holders"
+        if: ${{ !inputs.catchup }}
         id: holders
         continue-on-error: true
         run: python scripts/build_holders_page.py data/flows_cache data/flows_cache/holders.html
 
       - name: "Projects: revenue multiple"
+        if: ${{ !inputs.catchup }}
         id: valuation
         continue-on-error: true
         run: python scripts/revenue_multiple.py data/flows_cache/valuation.json
@@ -181,6 +197,10 @@ jobs:
           if st["pages"]["valuation.json"] and not st["pages"]["valuation.json"]["asof"]:
               st["pages"]["valuation.json"]["asof"] = old.get("asof")        # a failed fetch keeps the last good file and its date
           st["logos"] = sorted(os.listdir("docs/logos"))
+          try:                         # how far capital reached: site-data.yml starts a catch-up run when it's a day short
+              st["capital"] = {"through": json.load(open("data/flows_cache/capital.json"))["asof"]}
+          except (OSError, ValueError, KeyError):
+              st["capital"] = None
           steps = {"read the chain": "READ", "token facts": "META", "capital": "CAPITAL", "holders roll": "ROLL", "home": "HOME",
                    "flows": "FLOWS", "smart money": "SMART", "holders": "HOLDERS", "revenue multiple": "VALUATION"}
           st["failures"] = [k for k, e in steps.items() if os.environ.get(e) not in ("success", "skipped", "")]
