@@ -18,6 +18,7 @@ from site_shell import fm, signed, pct, dshort
 
 FLAT = 0.5          # 7-day flow within this % of the capital on the chain reads as steady
 TOP = 5
+AGO = 7             # the level also marks where the score read this many days earlier
 
 
 def shown_tokens(flows, meta):
@@ -70,6 +71,34 @@ def followed(rows, idx, min_weeks=4):
     return {"in": statistics.median(pos), "out": statistics.median(neg), "n_in": len(pos), "n_out": len(neg), "from": first}
 
 
+def score_ago(cache_dir, flows, toks, rows, states, parts, ago=AGO):
+    """The inflow score as it read `ago` days earlier: the same three parts, over the 7 days ending then, for the
+    tokens shown today. None unless every part today's score uses can be rebuilt for that day (the flows cache has
+    to reach back ago + 7 days), so the two readings are always like for like."""
+    then = {"capital": IN.capital_part(rows, len(rows) - 1 - ago), "buying": None, "wallets": None}
+    A = dt.date.fromisoformat(flows["asof"]) - dt.timedelta(days=ago)
+    days = [(A - dt.timedelta(days=i)).isoformat() for i in range(7)][::-1]
+    want, win = {t["symbol"] for t in toks}, []
+    for name in sorted(os.listdir(cache_dir)):
+        tdir = os.path.join(cache_dir, name)
+        if not (os.path.isdir(tdir) and os.path.exists(os.path.join(tdir, "head.json.gz"))):
+            continue
+        raw = FM.load_token(tdir)
+        if raw["symbol"] in want and all(d in raw["days"] for d in days):
+            # token_window sizes wallets by their holdings at the head, so only its all-wallet totals hold for an
+            # earlier window; those are all the buying part needs
+            win.append({"w": {"7d": FM.token_window(raw, days)}})
+    if want and len(win) >= 0.8 * len(want):
+        then["buying"] = IN.buying_part(win)
+    if os.path.isdir(states):
+        nw = IN.new_wallets(states, sorted(want), flows["asof"], days=35 + ago)
+        ds = sorted(nw)[:35]
+        then["wallets"] = IN.wallets_part({d: nw[d] for d in ds}) if len(ds) == 35 else None
+    if any((parts.get(k) is None) != (then[k] is None) for k in then):
+        return None
+    return IN.combine(then)
+
+
 def model(cache_dir):
     cap = json.load(open(os.path.join(cache_dir, "capital.json")))
     meta = json.load(open(os.path.join(cache_dir, "tokens_meta.json")))
@@ -82,6 +111,10 @@ def model(cache_dir):
     parts = {"capital": IN.capital_part(rows), "buying": IN.buying_part(toks) if "7d" in flows["windows"] else None,
              "wallets": IN.wallets_part(nw) if nw else None}
     score = IN.combine(parts)
+    try:
+        ago = score_ago(cache_dir, flows, toks, rows, states, parts) if score is not None else None
+    except Exception as e:                    # the marker is an extra: never lose the page over it
+        print(f"home: no earlier reading ({e})"); ago = None
     idx = token_index(states, syms) if os.path.isdir(states) else {}
     prev = IN.capital_part(rows, len(rows) - 8)
     wid = "7d" if "7d" in flows["windows"] else "1d"
@@ -89,6 +122,7 @@ def model(cache_dir):
     tok_row = lambda t: {"s": t["symbol"], "net": t["w"][wid]["all"]["net"], "chg": t["w"][wid]["price_chg"],
                          "of": t["w"][wid]["all"]["net"] / TM.size(meta[t["symbol"]]) * 100 if TM.size(meta[t["symbol"]]) else None}
     return {"asof": cap["asof"], "flows_asof": flows["asof"], "rows": rows, "parts": parts, "score": score, "prev": prev,
+            "score_ago": ago,
             "new_wallets": nw, "followed": followed(rows, idx), "wid": wid, "window": flows["windows"][wid],
             "bought": [tok_row(t) for t in ranked[:TOP] if t["w"][wid]["all"]["net"] > 1],
             "sold": [tok_row(t) for t in ranked[::-1][:TOP] if t["w"][wid]["all"]["net"] < -1],
@@ -159,10 +193,13 @@ def meter(m):
     if m["score"] is None:
         return ""
     sc = round(m["score"]); state = IN.state(m["score"]); tone = _tone(m["score"])
-    return f"""<div class="meter" role="img" aria-label="Inflow score {sc} out of 100: {state.lower()}">
+    ago = m.get("score_ago")
+    was = "" if ago is None else f' data-was="{round(ago)}"'
+    said = "" if ago is None else f". It read {round(ago)} a week ago"
+    return f"""<div class="meter" role="img" aria-label="Inflow score {sc} out of 100: {state.lower()}{said}">
 <div class="m-n"><div class="k">Inflow score</div><div class="m-v"><b class="num">{sc}</b><small>/100</small></div>
 <div class="m-s">{SH.SYM[("up", "down", "flat")[tone]]}{state}</div></div>
-<div class="m-art" aria-hidden="true" data-score="{sc}"><pre class="cur"></pre><pre class="shp"></pre><pre class="lab"></pre></div>
+<div class="m-art{'' if ago is None else ' has-was'}" aria-hidden="true" data-score="{sc}"{was}><pre class="cur"></pre><pre class="shp"></pre><pre class="lab"></pre><pre class="was"></pre></div>
 </div>"""
 
 
@@ -286,7 +323,7 @@ def view(m, href=lambda i: f"/{i}"):
 
 <details class="how"><summary>How this is measured</summary><dl>
 <dt>Net capital flow</dt><dd>Stablecoins (USDG, USDe, syrupUSDG) minted on Robinhood Chain less burned, read from the chain, plus the change in ETH held by the chain's bridge on Ethereum, valued at that day's ETH price. Every ETH on the chain is backed by ETH in that bridge, whichever bridge a user took.</dd>
-<dt>Inflow score</dt><dd>0 to 100 on fixed scales, 50 is balanced. Capital onto the chain (40%): 7-day net flow as a share of capital already there, −3% scores 0 and +3% scores 100. Buying of RH tokens (35%): the share of wallet volume that was buying, 45% scores 0 and 55% scores 100. New wallets (25%): first positions of $10+ this week against a typical week this month, −50% scores 0 and +50% scores 100.</dd>
+<dt>Inflow score</dt><dd>0 to 100 on fixed scales, 50 is balanced. Capital onto the chain (40%): 7-day net flow as a share of capital already there, −3% scores 0 and +3% scores 100. Buying of RH tokens (35%): the share of wallet volume that was buying, 45% scores 0 and 55% scores 100. New wallets (25%): first positions of $10+ this week against a typical week this month, −50% scores 0 and +50% scores 100. It is rescored every day over the last 7 days; the fainter level shows where it read a week earlier.</dd>
 <dt>Where it went</dt><dd>USD bought less USD sold by wallets in each token's main pools. Bots are left out, and so are tokens with under $50K of liquidity or with {IN.PASS_NOTE}. Stock tokens have their own page.</dd>
 <dt>Sources</dt><dd>Robinhood Chain (stablecoins, trades, holders), DefiLlama (bridge ETH, TVL, volume, fees), GeckoTerminal (prices).</dd>
 </dl></details>
@@ -303,6 +340,7 @@ CSS = r"""
 .art .cur{color:var(--soft2);opacity:.55}
 .m-art .cur{color:var(--soft2);opacity:.6}
 .m-art .lab{color:var(--soft)}
+.m-art .was{color:var(--lime-ink);opacity:.34}
 .art .shp,.m-art .shp{color:var(--lime-ink)}
 .hc{position:relative;z-index:1;padding:48px 48px 44px;max-width:60%}
 .hc .lede{max-width:52ch}
@@ -320,6 +358,7 @@ CSS = r"""
 .m-v small{font:500 17px var(--tight);color:var(--soft2)}
 .m-s{display:flex;align-items:center;gap:8px;margin-top:8px;font:600 19px var(--tight);letter-spacing:-.01em}
 .m-art{position:relative;height:91px;min-width:0}
+.m-art.has-was{height:104px}
 .strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line)}
 .cell{position:relative;padding:22px 26px 22px;border-left:1px solid var(--line);min-width:0}
 .cell:first-child{border-left:0}
@@ -461,25 +500,36 @@ JS = r"""
    a+=la+'\n';b+=lb+'\n'}
   cur.textContent=a;shp.textContent=b;
  }
- /* the meter: five rows of level, a tick row and a label row; the level's edge moves like a waterline */
- const mc=mart&&mart.querySelector('.cur'),ms=mart&&mart.querySelector('.shp'),ml=mart&&mart.querySelector('.lab'),score=mart?+mart.dataset.score:0;
+ /* the meter: five rows of level, a tick row and a label row; the level's edge moves like a waterline.
+    Where the score read a week ago is a second level in the same hand, fainter: past this week's edge when the
+    score has fallen, and as a waterline seen through this week's level when it has risen. */
+ const mc=mart&&mart.querySelector('.cur'),ms=mart&&mart.querySelector('.shp'),ml=mart&&mart.querySelector('.lab'),mw=mart&&mart.querySelector('.was'),score=mart?+mart.dataset.score:0;
+ const was=mart&&mart.dataset.was!==undefined&&mw?+mart.dataset.was:null;
  let mcols=0;
  const put=(arr,pos,text)=>{for(let i=0;i<text.length;i++){const k=pos+i;if(k>=0&&k<arr.length)arr[k]=text[i]}};
  function drawMeter(){
   if(!mart||mcols<20)return;
   const R=5,edge=score/100*(mcols-1),c40=Math.round(0.4*(mcols-1)),c60=Math.round(0.6*(mcols-1));
-  let a='',b='';
-  for(let r=0;r<R;r++){let la='',lb='';const e=edge+Math.sin(r*1.35+tt*1.6)*1.1+Math.sin(r*0.7-tt*0.9)*0.6;
+  const wedge=was==null?null:was/100*(mcols-1),under=wedge!=null&&wedge<edge-2.5;
+  let a='',b='',w='';
+  for(let r=0;r<R;r++){let la='',lb='',lw='';const e=edge+Math.sin(r*1.35+tt*1.6)*1.1+Math.sin(r*0.7-tt*0.9)*0.6;
+   const e2=wedge==null?-1:wedge+Math.sin(r*1.35+tt*1.6+2.1)*1.1+Math.sin(r*0.7-tt*0.9+1.3)*0.6,seam=under?Math.round(e2):-1;
    for(let c=0;c<mcols;c++){
-    if(c<=e){const f=(field(c*1.7,r*3.4,tt*1.3)+1.9)/3.8;lb+=RAMP.charAt(Math.max(0,Math.min(RAMP.length-1,Math.floor((0.3+0.7*f)*RAMP.length))));la+=' '}
-    else{lb+=' ';la+=(c===c40||c===c60)?'|':((c+r)%2?':':'.')}
+    if(c<=e){
+     if(c===seam||c===seam+1){lb+=' ';la+=' ';lw+=c===seam?':':' '}
+     else{const f=(field(c*1.7,r*3.4,tt*1.3)+1.9)/3.8;lb+=RAMP.charAt(Math.max(0,Math.min(RAMP.length-1,Math.floor((0.3+0.7*f)*RAMP.length))));la+=' ';lw+=' '}}
+    else if(c<=e2){const f=(field(c*1.7+40,r*3.4,tt*1.3)+1.9)/3.8;lw+=RAMP.charAt(Math.max(0,Math.min(RAMP.length-1,Math.floor((0.1+0.6*f)*RAMP.length))));lb+=' ';la+=' '}
+    else{lb+=' ';lw+=' ';la+=(c===c40||c===c60)?'|':((c+r)%2?':':'.')}
    }
-   a+=la+'\n';b+=lb+'\n'}
+   a+=la+'\n';b+=lb+'\n';w+=lw+'\n'}
   const ticks=new Array(mcols).fill(' '),labs=new Array(mcols).fill(' ');
   put(ticks,0,'0');put(ticks,c40-1,'40');put(ticks,c60-1,'60');put(ticks,mcols-3,'100');
   const mid=(x,y,s)=>put(labs,Math.round((x+y)/2-s.length/2),s);
   mid(0,c40,'OUTFLOW');mid(c40,c60,'BALANCED');mid(c60,mcols-1,'INFLOW');
-  mc.textContent=a;ms.textContent=b;ml.textContent='\n'.repeat(R)+ticks.join('')+'\n'+labs.join('');
+  let top='';
+  if(wedge!=null){const t=was+' A WEEK AGO',row=new Array(mcols).fill(' '),cp=Math.round(wedge);
+   put(row,Math.max(0,cp+t.length>mcols?cp-t.length+1:cp),t);top=row.join('')+'\n';a='\n'+a;b='\n'+b;w='\n'+w}
+  mc.textContent=a;ms.textContent=b;if(mw)mw.textContent=w;ml.textContent=top+'\n'.repeat(R)+ticks.join('')+'\n'+labs.join('');
  }
  function resize(){card.style.setProperty('--lowerh',lower.offsetHeight+'px');
   measure();cols=Math.ceil(art.clientWidth/cw);rows=Math.ceil(art.clientHeight/lh);mcols=mart?Math.floor(mart.clientWidth/cw):0;buildMask();drawArt();drawMeter()}
@@ -500,7 +550,8 @@ def main():
     out = SH.page(v, f"Data through {dshort(m['asof'])}", m["meta"])
     tmp = sys.argv[2] + ".tmp"
     open(tmp, "w", encoding="utf-8").write(out); os.replace(tmp, sys.argv[2])
-    print(f"home: {headline_text(m)} score {m['score']:.0f}" if m["score"] is not None else "home: built without a score")
+    ago = "not enough history yet" if m.get("score_ago") is None else f"{m['score_ago']:.0f}"
+    print(f"home: {headline_text(m)} score {m['score']:.0f}, a week ago: {ago}" if m["score"] is not None else "home: built without a score")
 
 
 if __name__ == "__main__":
