@@ -1,4 +1,5 @@
 """Post each new day's large-wallet alerts to Discord: one message per day, and nothing on a day with no alerts.
+The latest day's message ends with one line on what the most profitable wallets did, from the Smart money page.
 
 The alerts come from alerts.py. The webhook address is read from the DISCORD_WEBHOOK_URL environment variable and is
 never printed. With no webhook set this does nothing and exits cleanly, so the workflow step can sit in place before
@@ -10,15 +11,16 @@ was missed (a failed run, Discord down) is posted on the next run, up to BACKLOG
 
 Usage: post_alerts.py <cache_dir> [--dry-run]     --dry-run prints the messages and sends and records nothing
 """
-import json, os, sys, time, urllib.error, urllib.request
+import json, os, re, sys, time, urllib.error, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import alerts as AL
-from site_shell import fm, dshort
+from site_shell import fm, signed, dshort
 
 SITE = "https://rhchain.stateofblocks.com/flows"
 HOSTS = ("https://discord.com/api/webhooks/", "https://discordapp.com/api/webhooks/")
 BACKLOG = 3                      # days back a missed day is still posted
 LIMIT = 1900                     # Discord takes 2,000 characters a message
+QUIET = 5_000                    # smart money's net on the day under which they "were quiet"
 
 
 def line(a):
@@ -36,12 +38,32 @@ def line(a):
     return f"{'▲' if buy else '▼'} **{a['s']}** · {s}" + (f" {a['more']}" if a["more"] else "")
 
 
-def messages(day, alerts):
+def smart_line(cache, day):
+    """One line on what the most profitable wallets did that day, read from the Smart money page built earlier in
+    the same run so it matches the site. None when that page is missing, unreadable or for another day."""
+    try:
+        s = open(os.path.join(cache, "smart.html"), encoding="utf-8").read()
+        w = json.loads(re.search(r'<script[^>]*id="smart-money-data"[^>]*>(.*?)</script>', s, re.S).group(1))["wins"]["1d"]
+        if w["label"] != dshort(day):
+            return None
+        T = w["tokens"]; net = sum(t["net"] for t in T); crowd = sum(t["crowd"] for t in T)
+        rest = f"Everyone else net {'bought' if crowd >= 0 else 'sold'} {fm(abs(crowd))}."
+        who = f"the {w['n']} most profitable wallets"
+        if abs(net) < QUIET:
+            return f"• **Smart money** · {who} were quiet. {rest}"
+        lead = max(T, key=lambda t: t["net"]) if net > 0 else min(T, key=lambda t: t["net"])
+        return (f"{'▲' if net > 0 else '▼'} **Smart money** · {who} net {'bought' if net > 0 else 'sold'} {fm(abs(net))}, "
+                f"led by {lead['s']} ({signed(lead['net'])}). {rest}")
+    except Exception:
+        return None
+
+
+def messages(day, alerts, extra=None):
     """The day's alerts as one message, split only if it runs past Discord's limit."""
-    head = f"**Large-wallet moves on Robinhood Chain · {dshort(day)}**"
+    head = f"**Big moves on Robinhood Chain · {dshort(day)}**"
     foot = f"Large wallets hold $5K+ of the token. Data, not advice. <{SITE}>"
     out, cur = [], head
-    for ln in [line(a) for a in alerts] + [foot]:
+    for ln in [line(a) for a in alerts] + ([extra] if extra else []) + [foot]:
         if len(cur) + 1 + len(ln) > LIMIT:
             out.append(cur); cur = ln
         else:
@@ -93,11 +115,14 @@ def main():
     sp = os.path.join(cache, "alerts_posted.json")
     state = json.load(open(sp)) if os.path.exists(sp) else {}
     todo = pending(m, state)
+    smart = smart_line(cache, m["asof"])               # only the latest day has a page to read
+    extra = lambda d: smart if d == m["asof"] else None
     n_today = sum(1 for a in m["alerts"] if a["d"] == m["asof"])
-    print(f"alerts: {n_today} on {m['asof']}, {len(m['alerts'])} since {m['from']}")
+    print(f"alerts: {n_today} on {m['asof']}, {len(m['alerts'])} since {m['from']}"
+          + ("" if smart else "; no smart money line, its page is missing or for another day"))
     if dry:
         for d, al in todo:
-            for t in messages(d, al):
+            for t in messages(d, al, extra(d)):
                 print("--- would post:\n" + t)
         return
     if not url:
@@ -106,7 +131,7 @@ def main():
         print("::warning title=Alerts::DISCORD_WEBHOOK_URL isn't a Discord webhook address, nothing sent"); return
     sent = 0
     for d, al in todo:
-        if not all(post(url, t) for t in messages(d, al)):
+        if not all(post(url, t) for t in messages(d, al, extra(d))):
             break                                     # leave this day and later ones for the next run
         state["through"] = d; sent += 1
         tmp = sp + ".tmp"
