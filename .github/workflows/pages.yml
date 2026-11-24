@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,9 +40,20 @@ jobs:
           touch docs/.nojekyll
           ls docs docs/site-data | head -40
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: docs
 
+      # deploy-pages looks the bundle up straight after the upload, and GitHub sometimes doesn't list it yet ("Found 0
+      # artifact(s)", then "No artifacts named github-pages"): wait 30 s and try once more. A second failure fails the job.
       - id: deploy
-        uses: actions/deploy-pages@v4
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+
+      - name: Wait 30 s before the second try
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 30
+
+      - id: deploy2
+        if: steps.deploy.outcome == 'failure'
+        uses: actions/deploy-pages@v5
