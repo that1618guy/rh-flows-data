@@ -91,6 +91,13 @@ def _post(payload):
         return json.loads(r.read())
 
 
+def _passing(e):
+    """A JSON-RPC error worth waiting out: a rate limit, or the RPC's own backend failing ("failed to call backend
+    endpoint"). Both back off and retry; with 16 tries the waits add up to about 4 minutes, so an outage still fails."""
+    m = str(e.get("message"))
+    return e.get("code") == 429 or "Too Many" in m or "backend endpoint" in m
+
+
 def rpc(method, params, tries=16):
     for k in range(tries):
         wait = 0.15 - (time.time() - _rpc_t[0])
@@ -104,7 +111,7 @@ def rpc(method, params, tries=16):
             continue
         if "error" in j:
             e = j["error"]
-            if e.get("code") == 429 or "Too Many" in str(e.get("message")):
+            if _passing(e):
                 time.sleep(min(30, 1 + 2 * k))
                 continue
             raise RPCError(str(e.get("message")))
@@ -128,7 +135,7 @@ def rpc_batch(calls, size=12, tries=16):
             except Exception:
                 time.sleep(min(30, 1 + 2 * k))
                 continue
-            if isinstance(j, dict) or any("error" in x and x["error"].get("code") == 429 for x in j):
+            if isinstance(j, dict) or any("error" in x and _passing(x["error"]) for x in j):
                 time.sleep(min(30, 1 + 2 * k))
                 continue
             res = [None] * len(grp)
