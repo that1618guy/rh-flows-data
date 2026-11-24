@@ -1,25 +1,25 @@
 {
- "built": "2026-11-24T03:40:44Z",
+ "built": "2026-11-24T10:47:57Z",
  "pages": {
   "home.html": {
-   "stamp": "Data through Nov 22",
+   "stamp": "Data through Nov 23",
    "data": true,
-   "bytes": 63871
+   "bytes": 63904
   },
   "flows.html": {
    "stamp": "Data through Nov 23",
    "data": true,
-   "bytes": 59409
+   "bytes": 59710
   },
   "smart.html": {
    "stamp": "Data through Nov 23",
    "data": true,
-   "bytes": 58712
+   "bytes": 58686
   },
   "holders.html": {
    "stamp": "Data through Nov 23",
    "data": true,
-   "bytes": 48560
+   "bytes": 48558
   },
   "valuation.json": {
    "asof": "2026-11-23",
@@ -47,7 +47,7 @@
   "UBIK.webp"
  ],
  "capital": {
-  "through": "2026-11-22"
+  "through": "2026-11-23"
  },
  "failures": []
 }
