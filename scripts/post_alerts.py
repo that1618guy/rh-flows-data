@@ -1,9 +1,11 @@
-"""Post each new day's large-wallet alerts to Discord: one message per day, and nothing on a day with no alerts.
-The latest day's message ends with one line on what the most profitable wallets did, from the Smart money page.
+"""Post each new day's large-wallet alerts to Discord: one short message per day, and nothing on a day with no alerts.
+
+The message is a one-sentence summary and then one short line per token: the token, the amount and what kind of move
+it was. On the latest day the summary also says what the most profitable wallets did, read from the Smart money page.
+No links.
 
 The alerts come from alerts.py. The webhook address is read from the DISCORD_WEBHOOK_URL environment variable and is
-never printed. With no webhook set this does nothing and exits cleanly, so the workflow step can sit in place before
-the Discord side exists.
+never printed. With no webhook set this does nothing and exits cleanly.
 
 What has been posted is kept in <cache_dir>/alerts_posted.json, so a second run on the same day, or a catch-up run,
 never posts twice. The first run with a webhook posts the latest day only, not the backlog. After that, a day that
@@ -16,30 +18,27 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import alerts as AL
 from site_shell import fm, signed, dshort
 
-SITE = "https://rhchain.stateofblocks.com/flows"
 HOSTS = ("https://discord.com/api/webhooks/", "https://discordapp.com/api/webhooks/")
 BACKLOG = 3                      # days back a missed day is still posted
 LIMIT = 1900                     # Discord takes 2,000 characters a message
 QUIET = 5_000                    # smart money's net on the day under which they "were quiet"
+FOOT = "Data, not advice."
 
 
 def line(a):
-    """One alert as one Discord line."""
+    """One alert as one short Discord line: the token, the amount and what kind of move it was."""
     buy = a["side"] == "buy"
-    did, undid = ("bought", "sold") if buy else ("sold", "bought")
-    share = AL._share(a["share"])
-    if a["kind"] == "turn":
-        s = (f"large wallets turned {'buyers' if buy else 'sellers'}: {fm(abs(a['day']))} {did}, after "
-             f"{fm(abs(a['prior']))} {undid} over the {a['prior_days']} days before ({share} of market cap).")
-    elif a["kind"] == "run":
-        s = f"large wallets {did} {a['run']} days running: {fm(abs(a['usd']))} in all ({share} of market cap)."
+    if a["kind"] == "run":
+        s = f"{signed(a['usd'])} over {a['run']} days"
+    elif a["kind"] == "turn":
+        s = f"{signed(a['usd'])} · turned {'buyers' if buy else 'sellers'}"
     else:
-        s = f"large wallets {did} {fm(abs(a['usd']))} ({share} of market cap)."
-    return f"{'▲' if buy else '▼'} **{a['s']}** · {s}" + (f" {a['more']}" if a["more"] else "")
+        s = signed(a["usd"])
+    return f"{'▲' if buy else '▼'} **{a['s']}** {s}"
 
 
 def smart_line(cache, day):
-    """One line on what the most profitable wallets did that day, read from the Smart money page built earlier in
+    """One sentence on what the most profitable wallets did that day, read from the Smart money page built earlier in
     the same run so it matches the site. None when that page is missing, unreadable or for another day."""
     try:
         s = open(os.path.join(cache, "smart.html"), encoding="utf-8").read()
@@ -47,23 +46,37 @@ def smart_line(cache, day):
         if w["label"] != dshort(day):
             return None
         T = w["tokens"]; net = sum(t["net"] for t in T); crowd = sum(t["crowd"] for t in T)
-        rest = f"Everyone else net {'bought' if crowd >= 0 else 'sold'} {fm(abs(crowd))}."
-        who = f"the {w['n']} most profitable wallets"
+        who = f"Smart money (top {w['n']} wallets by profit)"
+        rest = f"everyone else net {'bought' if crowd >= 0 else 'sold'} {fm(abs(crowd))}"
         if abs(net) < QUIET:
-            return f"• **Smart money** · {who} were quiet. {rest}"
+            return f"{who} was quiet, and {rest}."
         lead = max(T, key=lambda t: t["net"]) if net > 0 else min(T, key=lambda t: t["net"])
-        return (f"{'▲' if net > 0 else '▼'} **Smart money** · {who} net {'bought' if net > 0 else 'sold'} {fm(abs(net))}, "
-                f"led by {lead['s']} ({signed(lead['net'])}). {rest}")
+        join = "and" if (net > 0) == (crowd >= 0) else "while"
+        return (f"{who} net {'bought' if net > 0 else 'sold'} {fm(abs(net))}, led by {lead['s']} "
+                f"({signed(lead['net'])}), {join} {rest}.")
     except Exception:
         return None
 
 
+def summary(alerts, smart=None):
+    """The day in one or two sentences: how many tokens saw a big buy or sell, then smart money when there is a read."""
+    n = lambda k: f"{k} token{'' if k == 1 else 's'}"
+    b = sum(1 for a in alerts if a["side"] == "buy"); s = len(alerts) - b
+    if b and s:
+        did = f"made big buys in {n(b)} and big sells in {n(s)}"
+    elif b:
+        did = f"made big buys in {n(b)}, no big sells"
+    else:
+        did = f"made big sells in {n(s)}, no big buys"
+    return f"Large wallets ($5K+ holders) {did}." + (f" {smart}" if smart else "")
+
+
 def messages(day, alerts, extra=None):
-    """The day's alerts as one message, split only if it runs past Discord's limit."""
+    """The day's alerts as one message, split only if it runs past Discord's limit. Buys first, largest first."""
     head = f"**Big moves on Robinhood Chain · {dshort(day)}**"
-    foot = f"Large wallets hold $5K+ of the token. Data, not advice. <{SITE}>"
+    rows = sorted(alerts, key=lambda a: (a["side"] != "buy", -abs(a["usd"]), a["s"]))
     out, cur = [], head
-    for ln in [line(a) for a in alerts] + ([extra] if extra else []) + [foot]:
+    for ln in [summary(alerts, extra)] + [line(a) for a in rows] + [FOOT]:
         if len(cur) + 1 + len(ln) > LIMIT:
             out.append(cur); cur = ln
         else:
