@@ -121,30 +121,41 @@ def rpc(method, params, tries=16):
 
 
 def rpc_batch(calls, size=12, tries=16):
+    """Batched JSON-RPC. An item that comes back with a passing error (see _passing), or not at all, is asked again on
+    its own with the same backoff; any other error raises. A failed call never comes back as None."""
     out = []
     for i in range(0, len(calls), size):
         grp = calls[i:i + size]
-        payload = [{"jsonrpc": "2.0", "id": n, "method": m, "params": p} for n, (m, p) in enumerate(grp)]
+        res, todo = [None] * len(grp), list(range(len(grp)))
         for k in range(tries):
             wait = 0.4 - (time.time() - _rpc_t[0])
             if wait > 0:
                 time.sleep(wait)
             _rpc_t[0] = time.time()
             try:
-                j = _post(payload)
+                j = _post([{"jsonrpc": "2.0", "id": n, "method": grp[n][0], "params": grp[n][1]} for n in todo])
             except Exception:
                 time.sleep(min(30, 1 + 2 * k))
                 continue
-            if isinstance(j, dict) or any("error" in x and _passing(x["error"]) for x in j):
+            if isinstance(j, dict):                    # the whole batch refused
                 time.sleep(min(30, 1 + 2 * k))
                 continue
-            res = [None] * len(grp)
+            again = []
             for x in j:
-                res[x["id"]] = x.get("result")
-            out += res
-            break
+                if "error" in x:
+                    if not _passing(x["error"]):
+                        raise RPCError(str(x["error"].get("message")))
+                    again.append(x["id"])
+                else:
+                    res[x["id"]] = x.get("result")
+            got = {x.get("id") for x in j}
+            todo = again + [n for n in todo if n not in got]
+            if not todo:
+                break
+            time.sleep(min(30, 1 + 2 * k))
         else:
             raise RuntimeError("RPC batch kept failing")
+        out += res
     return out
 
 
@@ -235,8 +246,11 @@ def load_tokens(upto):
 def supplies_now(addrs):
     for attempt in range(4):
         L = int(rpc("eth_blockNumber", []), 16)
-        res = rpc_batch([("eth_call", [{"to": a, "data": "0x18160ddd"}, hex(L)]) for a in addrs])
-        if all(isinstance(r, str) and len(r) > 2 for r in res):
+        try:
+            res = rpc_batch([("eth_call", [{"to": a, "data": "0x18160ddd"}, hex(L)]) for a in addrs])
+        except RPCError:
+            res = []
+        if res and all(isinstance(r, str) and len(r) > 2 for r in res):
             return L, [int(r, 16) for r in res]
         log("  supply read fell outside the node's recent-state window, retrying")
     raise RuntimeError("could not read token supplies")

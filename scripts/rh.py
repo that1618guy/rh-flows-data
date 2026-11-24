@@ -17,26 +17,54 @@ def _post(payload, timeout=120):
     return json.load(urllib.request.urlopen(urllib.request.Request(RPC, data=body, headers=HDR), timeout=timeout))
 def _wait(e, k):
     time.sleep(12 * (k + 1) if isinstance(e, urllib.error.HTTPError) and e.code == 429 else 2 * (k + 1))
+def _passing(e):
+    """A JSON-RPC error worth waiting out: a rate limit, or the RPC's own backend failing ("failed to call backend
+    endpoint"). Retried with the same backoff as a network error; any other error goes back to the caller."""
+    m = str((e or {}).get("message"))
+    return bool(e) and (e.get("code") == 429 or "Too Many" in m or "backend endpoint" in m)
 def rpc(method, params, tries=10):
+    """The raw response. Passing errors are retried; any other error is returned in it for the caller to handle."""
     err = None
     for k in range(tries):
         _id[0] += 1
         try:
-            return _post({"jsonrpc": "2.0", "id": _id[0], "method": method, "params": params})
+            d = _post({"jsonrpc": "2.0", "id": _id[0], "method": method, "params": params})
         except Exception as e:
-            err = e; _wait(e, k)
+            err = e; _wait(e, k); continue
+        if isinstance(d, dict) and _passing(d.get("error")):
+            err = d["error"]; _wait(None, k); continue
+        return d
     raise RuntimeError(f"rpc {method} failed: {err}")
 def batch(method, params_list, size=50, tries=10):
+    """Results in order. An item that comes back with a passing error, or not at all, is asked again on its own with
+    the same backoff; any other error raises. A failed call never comes back as None."""
     out = []
     for i in range(0, len(params_list), size):
         part = params_list[i:i + size]
+        res, todo, err = [None] * len(part), list(range(len(part))), None
         for k in range(tries):
             try:
-                d = _post([{"jsonrpc": "2.0", "id": j, "method": method, "params": p} for j, p in enumerate(part)])
-                d = sorted(d, key=lambda x: x["id"]); out += [x.get("result") for x in d]; break
+                d = _post([{"jsonrpc": "2.0", "id": j, "method": method, "params": part[j]} for j in todo])
             except Exception as e:
-                if k == tries - 1: raise
-                _wait(e, k)
+                err = e; _wait(e, k); continue
+            if isinstance(d, dict):                    # the whole batch refused
+                err = d.get("error"); _wait(None, k); continue
+            again = []
+            for x in d:
+                if "error" in x:
+                    if not _passing(x["error"]):
+                        raise RuntimeError(f"rpc {method} failed: {x['error']}")
+                    err = x["error"]; again.append(x["id"])
+                else:
+                    res[x["id"]] = x.get("result")
+            got = {x.get("id") for x in d}
+            todo = again + [j for j in todo if j not in got]
+            if not todo:
+                break
+            _wait(None, k)
+        else:
+            raise RuntimeError(f"rpc batch {method} kept failing: {err}")
+        out += res
         time.sleep(0.15)
     return out
 def head():
