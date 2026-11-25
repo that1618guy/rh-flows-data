@@ -139,6 +139,16 @@ jobs:
         continue-on-error: true
         run: python scripts/build_holders_page.py data/flows_cache data/flows_cache/holders.html
 
+      - name: "Smart Filter: restore the log"
+        if: ${{ !inputs.catchup && hashFiles('data/flows_cache/smart_filter_log.json') == '' }}
+        run: "[ -f docs/smart_filter_log.json ] && cp docs/smart_filter_log.json data/flows_cache/smart_filter_log.json || true"
+
+      - name: "Page: smart filter"
+        if: ${{ !inputs.catchup }}
+        id: filter
+        continue-on-error: true
+        run: python scripts/build_smart_filter_page.py data/flows_cache data/flows_cache/smart-filter.html
+
       - name: "Projects: revenue multiple"
         if: ${{ !inputs.catchup }}
         id: valuation
@@ -173,9 +183,10 @@ jobs:
           SMART: ${{ steps.smart.outcome }}
           HOLDERS: ${{ steps.holders.outcome }}
           VALUATION: ${{ steps.valuation.outcome }}
+          FILTER: ${{ steps.filter.outcome }}
         run: |
           mkdir -p docs/logos
-          for p in home.html:home.html page.html:flows.html smart.html:smart.html holders.html:holders.html valuation.json:valuation.json; do
+          for p in home.html:home.html page.html:flows.html smart.html:smart.html holders.html:holders.html valuation.json:valuation.json smart-filter.html:smart-filter.html smart_filter_log.json:smart_filter_log.json; do
             src="data/flows_cache/${p%%:*}"; [ -f "$src" ] && cp "$src" "docs/${p##*:}"
           done
           [ -d data/flows_cache/logos ] && cp -f data/flows_cache/logos/* docs/logos/ 2>/dev/null || true
@@ -183,7 +194,7 @@ jobs:
           python - <<'PY'
           import datetime as dt, json, os, re
           st = {"built": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "pages": {}}
-          for f, i in (("home.html", "home"), ("flows.html", "flows"), ("smart.html", "smart-money"), ("holders.html", "holders")):
+          for f, i in (("home.html", "home"), ("flows.html", "flows"), ("smart.html", "smart-money"), ("holders.html", "holders"), ("smart-filter.html", "smart-filter")):
               try:
                   s = open(os.path.join("docs", f), encoding="utf-8").read()
               except OSError:
@@ -209,7 +220,7 @@ jobs:
           except (OSError, ValueError, KeyError):
               st["capital"] = None
           steps = {"read the chain": "READ", "token facts": "META", "capital": "CAPITAL", "holders roll": "ROLL", "home": "HOME",
-                   "flows": "FLOWS", "smart money": "SMART", "holders": "HOLDERS", "revenue multiple": "VALUATION"}
+                   "flows": "FLOWS", "smart money": "SMART", "holders": "HOLDERS", "revenue multiple": "VALUATION", "smart filter": "FILTER"}
           st["failures"] = [k for k, e in steps.items() if os.environ.get(e) not in ("success", "skipped", "")]
           json.dump(st, open("docs/status.json", "w"), indent=1)
           print(json.dumps(st, indent=1))

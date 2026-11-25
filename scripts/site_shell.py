@@ -9,6 +9,7 @@ SITE = "State of Robinhood Chain"
 # The whole site map. Overview is the home page; everything else lives in the Tools menu.
 TOOLS = [
     ("Tokens", [
+        ("smart-filter", "Smart Filter", "Tokens to watch, and why"),
         ("flows", "Flows", "Who is buying and selling"),
         ("smart-money", "Smart money", "What the best wallets hold and trade"),
         ("holders", "Holders", "How firmly each token is held"),
