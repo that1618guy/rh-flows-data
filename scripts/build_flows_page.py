@@ -177,6 +177,8 @@ def view(m, href=lambda i: f"/{i}"):
         left += f" Left out with {IN.PASS_NOTE}: {', '.join(m['passed'])}."
     if m["unpriced"]:
         left += f" No recent price: {', '.join(m['unpriced'])}."
+    gone = sorted(set(m["stale"]) | set(m["unpriced"]))      # a token whose read failed this run drops out of the list: name it
+    miss = (f'<p class="miss">Not shown today: {html.escape(", ".join(gone))} (didn\'t update this run).</p>' if gone else "")
     body = f"""
 <section class="pg-head">
 <p class="eyebrow">Flows · <span id="f-when"></span> <span class="nb">· updated daily</span></p>
@@ -193,7 +195,7 @@ def view(m, href=lambda i: f"/{i}"):
 <section class="sec">
 <div class="md">
 <div class="md-list"><div class="sec-h"><div class="seg" id="f-side" role="group" aria-label="Bought or sold"></div><p class="md-sum" id="f-sum"></p></div>
-<div class="panel"><ol class="rank" id="f-rows"></ol></div></div>
+<div class="panel"><ol class="rank" id="f-rows"></ol></div>{miss}</div>
 <aside class="panel insp" id="f-insp" aria-live="polite"></aside>
 </div>
 </section>
@@ -218,6 +220,7 @@ def view(m, href=lambda i: f"/{i}"):
 
 
 CSS = r"""
+.miss{margin:10px 0 0;color:var(--soft);font-size:13px}
 .dly svg{display:block;width:100%;height:48px;margin-top:10px}
 .coh4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .ch{padding:20px 20px 18px;border-left:1px solid var(--line);min-width:0}
