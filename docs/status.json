@@ -1,25 +1,25 @@
 {
- "built": "2026-11-25T03:34:22Z",
+ "built": "2026-11-25T09:22:24Z",
  "pages": {
   "home.html": {
    "stamp": "Data through Nov 24",
    "data": true,
-   "bytes": 63532
+   "bytes": 63354
   },
   "flows.html": {
    "stamp": "Data through Nov 24",
    "data": true,
-   "bytes": 59573
+   "bytes": 59625
   },
   "smart.html": {
    "stamp": "Data through Nov 24",
    "data": true,
-   "bytes": 58999
+   "bytes": 58065
   },
   "holders.html": {
    "stamp": "Data through Nov 24",
    "data": true,
-   "bytes": 48807
+   "bytes": 48560
   },
   "valuation.json": {
    "asof": "2026-11-24",
@@ -49,5 +49,7 @@
  "capital": {
   "through": "2026-11-24"
  },
- "failures": []
+ "failures": [
+  "holders roll"
+ ]
 }
