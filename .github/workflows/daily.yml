@@ -114,7 +114,16 @@ jobs:
         if: ${{ !inputs.catchup }}
         id: roll
         continue-on-error: true
-        run: for f in data/flows_cache/holders/*.state.json.gz; do python scripts/holders_state.py roll "$f" data/flows_cache; done
+        run: |
+          # One token never stops the rest: a state whose token left the cache is skipped, a failed roll is warned
+          # about and the loop goes on, and the step fails at the end if any roll failed (status.json records it).
+          failed=""
+          for f in data/flows_cache/holders/*.state.json.gz; do
+            sym=$(basename "$f" .state.json.gz)
+            if [ ! -d "data/flows_cache/$sym" ]; then echo "$sym: no token folder in the cache, skipped"; continue; fi
+            python scripts/holders_state.py roll "$f" data/flows_cache || { echo "::warning title=Holders::$sym didn't roll forward"; failed="$failed $sym"; }
+          done
+          if [ -n "$failed" ]; then echo "roll failed for:$failed"; exit 1; fi
 
       - name: "Page: home"
         id: home
