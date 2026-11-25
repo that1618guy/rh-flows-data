@@ -1,10 +1,10 @@
 {
- "built": "2026-11-25T01:11:00Z",
+ "built": "2026-11-25T03:34:22Z",
  "pages": {
   "home.html": {
-   "stamp": "Data through Nov 23",
+   "stamp": "Data through Nov 24",
    "data": true,
-   "bytes": 63491
+   "bytes": 63532
   },
   "flows.html": {
    "stamp": "Data through Nov 24",
@@ -47,7 +47,7 @@
   "UBIK.webp"
  ],
  "capital": {
-  "through": "2026-11-23"
+  "through": "2026-11-24"
  },
  "failures": []
 }
