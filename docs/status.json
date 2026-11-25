@@ -1,5 +1,5 @@
 {
- "built": "2026-11-25T10:30:33Z",
+ "built": "2026-11-25T12:15:50Z",
  "pages": {
   "home.html": {
    "stamp": "Data through Nov 24",
@@ -54,7 +54,5 @@
  "capital": {
   "through": "2026-11-24"
  },
- "failures": [
-  "holders roll"
- ]
+ "failures": []
 }
