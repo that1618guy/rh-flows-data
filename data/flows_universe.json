@@ -106,5 +106,11 @@
   "address": "0x88ad8ddf1e3898412146a534538d418c6f8a9062",
   "name": "STANDARD",
   "category": "ecosystem"
+ },
+ {
+  "symbol": "TEXEL",
+  "address": "0x0ddcab9ae04bda0c87ecc1640636fa11e8e613e8",
+  "name": "Texel",
+  "category": "memes"
  }
 ]
