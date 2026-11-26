@@ -21,6 +21,8 @@ from site_shell import fm, dshort
 SHOW_DAYS = 7                    # days listed before "Show earlier days"
 WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six"]
 AS = {"exit": "an exit", "smart": "smart money leaving", "washout": "a washout", "runup": "a run-up"}
+MEANS = {"exit": "The big holders are leaving.", "smart": "The most profitable wallets are selling.",
+         "washout": "It sold off hard."}
 WHAT = {
     "exit": "Large wallets sold over 7 days and the 50 largest holders cut their bags.",
     "smart": "Several of the most profitable wallets sold on the day, and few of them bought.",
@@ -47,7 +49,7 @@ def since(it, D):
     if k < 1:
         return None
     def move(sym):
-        c = D["F"][sym]
+        c = D["F"].get(sym) or {}                    # a token flagged earlier may have left the list since
         a, b = (c.get(it["d"]) or {}).get("close"), (c.get(D["asof"]) or {}).get("close")
         return (b / a - 1) * 100 if a and b else None
     r, ms = move(it["s"]), [x for x in (move(s) for s in D["shown"]) if x is not None]
@@ -60,7 +62,7 @@ def read(log, rec):
     asof = log["asof"]
     today = [it for it in log["items"] if it["d"] == asof and it["posted"]]
     live = [SU.KINDS[k][0].lower() for k in SU.ORDER if SU.KINDS[k][4]]
-    tail = " Every flag is scored on what price did after."
+    tail = " Each one says what flags like it have led to so far."
     if not today:
         last = next((it for it in reversed(log["items"]) if it["posted"]), None)
         p = f"No token showed {_join([AS[k] for k in SU.ORDER if SU.KINDS[k][4]])} on {dshort(asof)}."
@@ -81,7 +83,7 @@ TRACE_BEFORE, TRACE_AFTER = 14, 7
 
 def trace(it, D):
     """Closes around a flag for the small price chart: up to 14 days before it and 7 after, and where the flag sits."""
-    c = D["F"][it["s"]]
+    c = D["F"].get(it["s"]) or {}                # a token flagged earlier may have left the list since
     days = [d for d in SU.span(SU.shift(it["d"], TRACE_AFTER), TRACE_BEFORE + TRACE_AFTER + 1) if d in c and d <= D["asof"]]
     if len(days) < 3 or it["d"] not in days:
         return None
@@ -107,10 +109,11 @@ def view(m, href=lambda i: f"/{i}"):
                 cut.setdefault(SU.KINDS[it["kind"]][0].lower(), []).append(it["s"])
         days.append({"d": d, "label": dshort(d), "items": items,
                      "more": "; ".join(f"{', '.join(v)} ({k})" for k, v in cut.items())})
-    kinds = {k: {"name": n, "side": side, "days": nd, "posted": p, "what": WHAT[k]} for k, (n, side, nd, _q, p) in SU.KINDS.items()}
+    kinds = {k: {"name": n, "side": side, "days": nd, "posted": p, "what": WHAT[k], "means": MEANS.get(k, "")}
+             for k, (n, side, nd, _q, p) in SU.KINDS.items()}
     r = read(log, rec)
     data = {"asof": log["asof"], "from": log["days"][0], "days": days, "kinds": kinds, "order": SU.ORDER, "rec": rec,
-            "names": {s: x["name"] for s, x in m["meta"].items()}, "addr": {s: x["address"] for s, x in m["meta"].items()},
+            "min": SU.MIN_RECORD, "names": {s: x["name"] for s, x in m["meta"].items()}, "addr": {s: x["address"] for s, x in m["meta"].items()},
             "gt": "https://www.geckoterminal.com/robinhood/tokens/"}
     left = f" Left out with {IN.PASS_NOTE}: {', '.join(m['passed'])}." if m.get("passed") else ""
     body = f"""
@@ -182,7 +185,7 @@ CSS = r"""
 .sf-out span{font:500 13.5px var(--font);letter-spacing:0;color:var(--soft)}
 .sf-out small{display:block;margin-top:3px;font:400 12.5px var(--font);letter-spacing:0;color:var(--soft2)}
 .sf-out.new{font:500 13px var(--font);letter-spacing:0;color:var(--soft2)}
-.sf-mid{display:grid;grid-template-columns:minmax(0,1fr) 216px;gap:24px;align-items:stretch;margin-top:18px}
+.sf-mid{display:grid;grid-template-columns:minmax(0,1fr) 216px;gap:24px;align-items:stretch;margin-top:14px}
 .sf-t .i-k{margin-top:0}
 .sf-t .i-k b{font-size:24px}
 .sf-tr{display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0}
@@ -191,6 +194,9 @@ CSS = r"""
 .sf-dot{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:var(--panel);border:1.5px solid var(--text)}
 .sf-tr small{color:var(--soft2);font-size:12px}
 .sf-t .i-s{margin-top:14px;color:var(--soft)}
+.sf-say{margin-top:14px;font:600 17px/1.3 var(--tight);letter-spacing:-.01em}
+.sf-so{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-size:14.5px;line-height:1.5;text-wrap:pretty}
+.sf-so span{display:block;margin-bottom:3px;color:var(--soft2);font-size:12.5px}
 .sf-empty{padding:34px 0 30px;border-top:1px solid var(--line);color:var(--soft);font-size:15px}
 .sf-empty span{display:block;margin-top:4px;color:var(--soft2);font-size:13.5px}
 .sf-also{margin-top:14px;color:var(--soft2);font-size:13.5px}
@@ -265,11 +271,18 @@ JS = r"""
   const c=x.r<0?'dn':'up';
   return `<span class="sf-out"><b class="${c}">${pct(x.r,0)}</b> <span>${x.done?'in '+x.n+' days':'so far'}</span><small>median token ${pct(x.m,0)}${x.done?'':' · day '+x.k+' of '+x.n}</small></span>`}
  function ticket(it){
-  const also=it.also.length?` Also passes the ${it.also.join(' and ')} filter${it.also.length>1?'s':''}.`:'',note=(it.note+also).trim();
+  const note=it.note,byName=n=>D.order.find(k=>D.kinds[k].name.toLowerCase()===n);
+  const led=(k,first)=>{const K=D.kinds[k],r=D.rec[k],way=K.side<0?'did worse':'did better';
+   if(r.n<D.min)return first?`Too few ${K.name.toLowerCase()} flags have played out to say yet.`:'';
+   const tail=`${r.hit} of ${r.n} ${way} than the median token over the next ${K.days} days (${pct(r.r,0)} on average, against ${pct(r.m,0)})`;
+   return first?`So far, ${tail}.`:` It also passes the ${K.name.toLowerCase()} filter: ${tail}.`};
+  const so=led(it.kind,true)+it.also.map(byName).filter(Boolean).map(k=>led(k,false)).join('');
   return `<article class="panel sf-t"><div class="i-h">${av(it.s)}<span><b>${esc(it.s)}<span class="tag">${esc(D.kinds[it.kind].name)}</span></b><small>${esc(D.names[it.s]||'')}</small></span>${out(it.since)}</div>
+   <p class="sf-say">${esc(D.kinds[it.kind].means)}</p>
    <div class="sf-mid"><div class="i-k">${it.figs.map(f=>`<div><span>${esc(f[1])}</span><b>${esc(f[0])}</b></div>`).join('')}</div>
    ${it.trace?`<div class="sf-tr"><div class="sf-ch">${line(it.trace)}</div><small>Price, ${it.trace.from} to ${it.trace.to}</small></div>`:''}</div>
-   ${note?`<p class="i-s">${esc(note)}</p>`:''}</article>`}
+   ${note?`<p class="i-s">${esc(note)}</p>`:''}
+   <p class="sf-so"><span>What flags like this have led to</span>${esc(so)}</p></article>`}
  function render(){
   const count=k=>D.days.reduce((a,d)=>a+d.items.filter(i=>has(i,k)).length,0);
   SOB.seg($('sf-kind'),[['all',`All · ${count('all')}`]].concat(live.map(k=>[k,`${D.kinds[k].name} · ${count(k)}`])),S.kind,v=>{S.kind=v;render()});

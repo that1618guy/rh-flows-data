@@ -3,7 +3,13 @@ per-address balances, first and last acquisition, last outflow, and daily net mo
 Also stores the token's daily closes and the kind (wallet or contract) of every holder worth $1+. Feeds holders_model.
 
 Usage: holders_scan.py --universe U --out data/holders [--codes flows_cache/codes.json] [--days 40] [--only SYM,..]
+                       [--budget-min N]
 Output: <out>/<SYM>.json.gz, <out>/edges.json (first block of each UTC day)
+
+--budget-min makes a scan resumable, for tokens with millions of transfers: when the time is up it saves where it
+got to in <out>/.<SYM>.part.json.gz (and the block number in .<SYM>.part.at) and stops, and the next run with
+--budget-min carries on from there, on a later day too. Without it nothing is saved along the way and nothing is
+picked up, as before.
 """
 import argparse, bisect, collections, datetime as dt, gzip, json, os, sys, threading, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -68,7 +74,10 @@ def kinds_for(addrs, codes):
     return {a: codes.get(a, "eoa") for a in addrs}
 
 
-def scan(t, edges, day_list, codes, out_dir):
+PART_EVERY = 300                 # seconds between saves of a resumable scan
+
+
+def scan(t, edges, day_list, codes, out_dir, deadline=None):
     st = time.time()
     sym, token = t["symbol"], t["address"].lower()
     ctx = FE.prepare(token)
@@ -88,6 +97,42 @@ def scan(t, edges, day_list, codes, out_dir):
     first_in, last_in, last_out = {}, {}, {}
     daily = collections.defaultdict(lambda: collections.defaultdict(int))
     n = 0
+    part = os.path.join(out_dir, f".{sym}.part.json.gz")
+    if deadline:                             # carry on from where an earlier run stopped
+        try:
+            with gzip.open(part, "rt") as f:
+                P = json.load(f)
+            if P["token"] == token and P["cursor"] < after_b:
+                idx = {d: i for i, d in enumerate(day_list)}          # the window may have moved on a day or more
+                for a, (v, fi, li, lo, dd) in P["addrs"].items():
+                    if v:
+                        bal[a] = v
+                    if fi is not None:
+                        first_in[a] = fi
+                    if li is not None:
+                        last_in[a] = li
+                    if lo is not None:
+                        last_out[a] = lo
+                    for d, x in dd.items():
+                        if d in idx:
+                            daily[a][idx[d]] = x
+                start, n = P["cursor"] + 1, P["n"]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+
+    def save_part(cursor):
+        addrs = set(bal) | set(first_in) | set(last_out) | set(daily)
+        rec = {"token": token, "cursor": cursor, "n": n,
+               "addrs": {a: [bal.get(a, 0), first_in.get(a), last_in.get(a), last_out.get(a),
+                             {day_list[di]: x for di, x in daily[a].items()} if a in daily else {}] for a in addrs}}
+        tmp_p = part + ".tmp"
+        with gzip.open(tmp_p, "wt", compresslevel=3) as f:
+            json.dump(rec, f, separators=(",", ":"))
+        os.replace(tmp_p, part)
+        with open(part[:-len(".json.gz")] + ".at", "w") as f:          # how far it got, without opening the big file
+            json.dump({"cursor": cursor, "head": hb, "transfers": n}, f)
+
+    saved = time.time()
     for chunk in rh.iter_logs(token, [rh.TRANSFER], start, hb):
         for lg in chunk:
             if len(lg["topics"]) < 3:
@@ -105,6 +150,14 @@ def scan(t, edges, day_list, codes, out_dir):
             if b >= w0:
                 di = len(day_list) if b >= after_b else bisect.bisect_right(edge_blocks, b) - 1
                 daily[frm][di] -= v; daily[to][di] += v
+        # a chunk is a whole block range, so everything up to its last log's block is done. Saved only while still
+        # inside the window's days: what is left after that is under a day of blocks.
+        if deadline and chunk and (time.time() > deadline or time.time() - saved > PART_EVERY):
+            cur = int(chunk[-1]["blockNumber"], 16)
+            if cur < after_b:
+                save_part(cur); saved = time.time()
+                if time.time() > deadline:
+                    return f"{sym:9s} paused: {n:,} transfers so far, up to block {cur:,} of {hb:,} ({cur / hb * 100:.0f}%)"
     neg = [a for a, v in bal.items() if v < 0 and a != rh.ZERO]
     held = sum(v for a, v in bal.items() if v > 0 and a != rh.ZERO)
     try:
@@ -131,6 +184,10 @@ def scan(t, edges, day_list, codes, out_dir):
     with gzip.open(tmp, "wt") as f:
         json.dump(rec, f, separators=(",", ":"))
     os.replace(tmp, os.path.join(out_dir, f"{sym}.json.gz"))
+    if deadline:
+        for x in (part, part[:-len(".json.gz")] + ".at"):
+            if os.path.exists(x):
+                os.remove(x)
     gap = (held - supply) / supply * 100 if supply else 0
     return (f"{sym:9s} ok: {n:,} transfers, {sum(1 for v in bal.values() if v > 0):,} holders, "
             f"held vs supply {gap:+.3f}%, {len(neg)} negative, {time.time() - st:.0f}s")
@@ -141,7 +198,9 @@ def main():
     ap.add_argument("--universe", required=True); ap.add_argument("--out", required=True)
     ap.add_argument("--codes"); ap.add_argument("--days", type=int, default=40)
     ap.add_argument("--asof"); ap.add_argument("--only"); ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--budget-min", type=float)
     a = ap.parse_args()
+    deadline = time.time() + a.budget_min * 60 if a.budget_min else None
     os.makedirs(a.out, exist_ok=True)
     asof = a.asof or (dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=1)).isoformat()
     A = dt.date.fromisoformat(asof)
@@ -154,7 +213,7 @@ def main():
         uni = sorted([t for t in uni if t["symbol"] in want], key=lambda t: want.index(t["symbol"]))
     print(f"holders: {len(uni)} tokens, window {day_list[0]}..{day_list[-1]}", flush=True)
     with ThreadPoolExecutor(a.workers) as ex:
-        futs = {ex.submit(scan, t, edges, day_list, codes, a.out): t["symbol"] for t in uni}
+        futs = {ex.submit(scan, t, edges, day_list, codes, a.out, deadline): t["symbol"] for t in uni}
         for f in as_completed(futs):
             try:
                 print(f.result(), flush=True)

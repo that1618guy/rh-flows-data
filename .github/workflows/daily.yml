@@ -27,7 +27,7 @@ concurrency:
 jobs:
   flows:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,8 +57,18 @@ jobs:
             echo "::warning title=Flows::no cache-seed release, starting from yesterday"
           fi
 
-      # The stock tokens left the Flows universe (token pages are crypto only): clear their old folders from the cache.
-      # A no-op once they're gone.
+      # The token list keeps itself (scripts/universe.py; the rules are at the top of that file, the hand overrides in
+      # data/universe_rules.json). Before the read only the hand overrides are applied: no network, no time. A token
+      # blocked by hand is off tonight's pages. Everything slow is at the end of the job.
+      - name: "Token list: hand overrides"
+        if: ${{ !inputs.catchup }}
+        continue-on-error: true
+        timeout-minutes: 5
+        run: >-
+          python scripts/universe.py rules --universe data/flows_universe.json --state data/universe_state.json
+          --rules data/universe_rules.json --cache data/flows_cache --docs docs
+
+      # Clear the folders of tokens that are no longer on the list. A no-op on most nights.
       - name: "Flows: drop tokens that left the universe"
         run: |
           python - <<'PY'
@@ -169,7 +179,31 @@ jobs:
         continue-on-error: true
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python scripts/post_alerts.py data/flows_cache
+        run: python scripts/post_alerts.py data/flows_cache data/universe_state.json
+
+      # Last, so the list never holds up the pages or the Discord post. First the night is counted: who has gone
+      # quiet and is dropped, who has passed the rule and starts being read in. What changes here shows on the pages
+      # from the next run. A failure changes nothing: the list stays as it stood.
+      - name: "Token list: count the night"
+        if: ${{ !inputs.catchup }}
+        id: list
+        continue-on-error: true
+        timeout-minutes: 30
+        run: >-
+          python scripts/universe.py scan --universe data/flows_universe.json --state data/universe_state.json
+          --rules data/universe_rules.json --cache data/flows_cache --docs docs
+
+      # Then a newcomer's 30 days of flows and its holder scan go to data/flows_cache/warming/, apart from the listed
+      # tokens. It joins the list only once both are complete, and is on the pages from the next run. A big token
+      # takes several nights; the scan carries on where it stopped.
+      - name: "Token list: read in newcomers"
+        if: ${{ !inputs.catchup }}
+        id: warm
+        continue-on-error: true
+        timeout-minutes: 90
+        run: >-
+          python scripts/universe.py warm --universe data/flows_universe.json --state data/universe_state.json
+          --rules data/universe_rules.json --cache data/flows_cache --docs docs --budget-min 60
 
       - name: "Flows: save the chain cache"
         if: always()
@@ -193,6 +227,8 @@ jobs:
           HOLDERS: ${{ steps.holders.outcome }}
           VALUATION: ${{ steps.valuation.outcome }}
           FILTER: ${{ steps.filter.outcome }}
+          LIST: ${{ steps.list.outcome }}
+          WARM: ${{ steps.warm.outcome }}
         run: |
           mkdir -p docs/logos
           for p in home.html:home.html page.html:flows.html smart.html:smart.html holders.html:holders.html valuation.json:valuation.json smart-filter.html:smart-filter.html smart_filter_log.json:smart_filter_log.json; do
@@ -229,7 +265,8 @@ jobs:
           except (OSError, ValueError, KeyError):
               st["capital"] = None
           steps = {"read the chain": "READ", "token facts": "META", "capital": "CAPITAL", "holders roll": "ROLL", "home": "HOME",
-                   "flows": "FLOWS", "smart money": "SMART", "holders": "HOLDERS", "revenue multiple": "VALUATION", "smart filter": "FILTER"}
+                   "flows": "FLOWS", "smart money": "SMART", "holders": "HOLDERS", "revenue multiple": "VALUATION", "smart filter": "FILTER",
+                   "token list": "LIST", "token list read-in": "WARM"}
           st["failures"] = [k for k, e in steps.items() if os.environ.get(e) not in ("success", "skipped", "")]
           json.dump(st, open("docs/status.json", "w"), indent=1)
           print(json.dumps(st, indent=1))
@@ -238,6 +275,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A docs
+          git add data/flows_universe.json data/universe_state.json 2>/dev/null || true      # the list and its memory
           git diff --cached --quiet && exit 0
           git commit -m "Flows data $(date -u -d yesterday +%F)"
           git pull --rebase

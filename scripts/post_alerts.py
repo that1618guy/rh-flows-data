@@ -11,7 +11,11 @@ What has been posted is kept in <cache_dir>/alerts_posted.json, so a second run 
 never posts twice. The first run with a webhook posts the latest day only, not the backlog. After that, a day that
 was missed (a failed run, Discord down) is posted on the next run, up to BACKLOG days back.
 
-Usage: post_alerts.py <cache_dir> [--dry-run]     --dry-run prints the messages and sends and records nothing
+A token joining or leaving the list (universe.py) gets one line the day it happens: with that day's flags, or as a
+message of its own on a day with none. Pass the list's state file to turn that on.
+
+Usage: post_alerts.py <cache_dir> [universe_state.json] [--dry-run]
+       --dry-run prints the messages and sends and records nothing
 """
 import json, os, sys, time, urllib.error, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -49,10 +53,41 @@ def more(cut):
     return ("Also flagged: " + "; ".join(f"{', '.join(v)} ({SU.KINDS[k][0].lower()})" for k, v in by.items()) + ".") if by else ""
 
 
-def messages(day, items, rec, cut=()):
-    """The day's flags as one message, split only if it runs past Discord's limit."""
+def list_notes(path, state, asof):
+    """({day: "New on the list: A. Dropped: B (why)."}, {day: its newest change}, the newest change so far) for the
+    changes to the token list not posted yet. Changes are numbered as they happen, so one made by a later run of
+    the same night is still posted. A token read in at the end of a run is dated the next day, the first day the
+    pages show it, and is posted then. BACKLOG nights back at most, and only the latest night the first time."""
+    try:
+        events = [e for e in json.load(open(path))["events"] if e.get("d") and e.get("n")] if path else []
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}, {}, 0
+    top = max((e["n"] for e in events if e["d"] <= asof), default=0)    # one dated tomorrow is still to come
+    by = {}
+    for e in events:
+        if e["d"] <= asof and (e["n"] > state["list"] if "list" in state else e["d"] == asof):
+            by.setdefault(e["d"], []).append(e)
+    out, last = {}, {}
+    for d in sorted(by)[-BACKLOG:]:
+        add, drop = ([e for e in by[d] if e["type"] == t] for t in ("add", "drop"))
+        said = []
+        if add:
+            said.append("New on the list: " + ", ".join(e["s"] for e in add) + ".")
+        if drop:
+            why = lambda e: f" ({e['why']})" if e.get("why") and e["why"] != "blocked" else ""
+            said.append("Dropped: " + ", ".join(e["s"] + why(e) for e in drop) + ".")
+        if said:
+            out[d] = " ".join(said); last[d] = max(e["n"] for e in by[d])
+    return out, last, top
+
+
+def messages(day, items, rec, cut=(), note=""):
+    """The day's flags as one message, split only if it runs past Discord's limit. note: that day's changes to the
+    token list; on a day with no flags it is the whole message."""
     out, cur = [], f"**Smart Filter · Robinhood Chain · {dshort(day)}**"
-    for ln in [line(it) for it in items] + [x for x in (more(cut), so_far(items, rec)) if x] + [FOOT]:
+    if not items:
+        return [cur + "\n" + note] if note else []
+    for ln in [line(it) for it in items] + [x for x in (more(cut), so_far(items, rec), note) if x] + [FOOT]:
         if len(cur) + 1 + len(ln) > LIMIT:
             out.append(cur); cur = ln
         else:
@@ -98,14 +133,18 @@ def main():
     if len(sys.argv) < 2:
         raise SystemExit(__doc__)
     cache, dry = sys.argv[1], "--dry-run" in sys.argv
+    lpath = next((x for x in sys.argv[2:] if not x.startswith("--")), None)
     url = (os.environ.get("DISCORD_WEBHOOK_URL") or "").strip()
     log, _ = SU.update(cache)
     sp = os.path.join(cache, "alerts_posted.json")
     state = json.load(open(sp)) if os.path.exists(sp) else {}
     todo = pending(log, state)
+    notes, note_n, top_n = list_notes(lpath, state, log["asof"])
+    todo = sorted(dict([(d, []) for d in notes] + todo).items())           # a day with only a list change is posted too
     n_today = sum(1 for it in log["items"] if it["d"] == log["asof"] and it["posted"])
     print(f"smart filter: {n_today} flagged on {log['asof']}, {sum(1 for it in log['items'] if it['posted'])} since {log['days'][0]}")
-    msgs = lambda d, items: messages(d, items, SU.record(log, upto=d), [it for it in log["items"] if it["d"] == d and it.get("cut")])
+    msgs = lambda d, items: messages(d, items, SU.record(log, upto=d), [it for it in log["items"] if it["d"] == d and it.get("cut")],
+                                     notes.get(d, ""))
     if dry:
         for d, items in todo:
             for t in msgs(d, items):
@@ -119,7 +158,12 @@ def main():
     for d, items in todo:
         if not all(post(url, t) for t in msgs(d, items)):
             break
-        state["through"] = d; sent += 1
+        state["through"] = max(d, state.get("through", "")); sent += 1
+        if d in notes:
+            state["list"] = max(note_n[d], state.get("list", 0))
+    else:
+        if lpath:
+            state["list"] = max(top_n, state.get("list", 0))        # no list change left to post
     if not todo and state.get("through", "") < log["asof"]:
         state["through"] = log["asof"]                     # a day with nothing to post is done too
     tmp = sp + ".tmp"
