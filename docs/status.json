@@ -1,30 +1,30 @@
 {
- "built": "2026-11-28T04:23:43Z",
+ "built": "2026-11-28T09:40:52Z",
  "pages": {
   "home.html": {
    "stamp": "Data through Nov 27",
    "data": true,
-   "bytes": 64517
+   "bytes": 64522
   },
   "flows.html": {
    "stamp": "Data through Nov 27",
    "data": true,
-   "bytes": 67746
+   "bytes": 67751
   },
   "smart.html": {
    "stamp": "Data through Nov 27",
    "data": true,
-   "bytes": 60196
+   "bytes": 60201
   },
   "holders.html": {
    "stamp": "Data through Nov 27",
    "data": true,
-   "bytes": 48803
+   "bytes": 48808
   },
   "smart-filter.html": {
    "stamp": "Data through Nov 27",
    "data": true,
-   "bytes": 95435
+   "bytes": 95440
   },
   "valuation.json": {
    "asof": "2026-11-27",
