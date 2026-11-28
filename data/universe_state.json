@@ -1,6 +1,6 @@
 {
  "version": 1,
- "night": "2026-11-26",
+ "night": "2026-11-27",
  "tokens": {
   "0x020bfc650a365f8bb26819deaabf3e21291018b4": {
    "symbol": "CASHCAT",
@@ -11,8 +11,8 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 1537061,
-   "traders": 654
+   "liq": 1508676,
+   "traders": 729
   },
   "0x0339f5459fc690ac85f1782e15782a151b4a9e1b": {
    "symbol": "WALLET",
@@ -23,8 +23,8 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 812364,
-   "traders": 146
+   "liq": 806632,
+   "traders": 95
   },
   "0x2e8c31162b855a2ffa90f6f8634643ad6f111e18": {
    "symbol": "AI",
@@ -35,8 +35,8 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 1220927,
-   "traders": 755
+   "liq": 1292697,
+   "traders": 930
   },
   "0x7fe995a80075df3dc8ae11a9b82c7fe4202cd87f": {
    "symbol": "HMM",
@@ -47,8 +47,8 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 177617,
-   "traders": 184
+   "liq": 169944,
+   "traders": 234
   },
   "0x98096d17e191b3da1d5f99a6d7b3584351b11e18": {
    "symbol": "BONER",
@@ -59,8 +59,8 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 376707,
-   "traders": 261
+   "liq": 406373,
+   "traders": 271
   },
   "0x45242320dbb855eea8fd36804c6487e10e97fcf9": {
    "symbol": "TENDIES",
@@ -71,8 +71,8 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 208157,
-   "traders": 160
+   "liq": 204029,
+   "traders": 137
   },
   "0x385f4f8ae47651ce5f58f5265395a669f8281e18": {
    "symbol": "MEME",
@@ -83,8 +83,8 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 528878,
-   "traders": 255
+   "liq": 514340,
+   "traders": 236
   },
   "0x812486eaea648819853f8e372dc9f1516c7868bd": {
    "symbol": "UBIK",
@@ -95,21 +95,20 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 215302,
-   "traders": 74
+   "liq": 207233,
+   "traders": 146
   },
   "0x1a911bb954daa9cb38513423075be74450351e18": {
    "symbol": "MONITOR",
    "name": "The Situation",
    "status": "listed",
    "good": 0,
-   "bad": 1,
+   "bad": 0,
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 101777,
-   "traders": 9,
-   "why": "fewer than 10 wallets trading it"
+   "liq": 98139,
+   "traders": 25
   },
   "0xd9db30bb0d2b8d2eae3826a1372117e058791e18": {
    "symbol": "MOO",
@@ -120,8 +119,8 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 143293,
-   "traders": 54
+   "liq": 149087,
+   "traders": 61
   },
   "0x42afa2124ca5a2b83898e46b2da9a190995b1e18": {
    "symbol": "SCHIFFY",
@@ -132,8 +131,8 @@
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 142983,
-   "traders": 90
+   "liq": 153986,
+   "traders": 97
   },
   "0x39dbed3a2bd333467115de45665cc57f813c4571": {
    "symbol": "PONS",
@@ -144,20 +143,20 @@
    "how": "start",
    "added": null,
    "category": "ecosystem",
-   "liq": 2208252,
-   "traders": 651
+   "liq": 2279580,
+   "traders": 1024
   },
   "0x0b7c6c138dc75622f4200d157b13fb93e6bd94fa": {
    "symbol": "MOW",
    "name": "MowCat",
    "status": "listed",
    "good": 0,
-   "bad": 2,
+   "bad": 3,
    "how": "start",
    "added": null,
    "category": "memes",
-   "liq": 2996,
-   "traders": 1084,
+   "liq": 4122,
+   "traders": 1203,
    "why": "under $25K of liquidity"
   },
   "0xedbf91223639800bcd5756815caf908df3b890be": {
@@ -169,8 +168,8 @@
    "how": "start",
    "added": null,
    "category": "agents",
-   "liq": 321312,
-   "traders": 331
+   "liq": 313630,
+   "traders": 290
   },
   "0x72be1277e198d0c476869253cb4e62807e14533c": {
    "symbol": "RAETO",
@@ -181,8 +180,8 @@
    "how": "start",
    "added": null,
    "category": "agents",
-   "liq": 69540,
-   "traders": 206
+   "liq": 68220,
+   "traders": 159
   },
   "0xaa07a0e9209e16ac99708c3ec70159c6ef3128a3": {
    "symbol": "ORBIO",
@@ -193,8 +192,8 @@
    "how": "start",
    "added": null,
    "category": "agents",
-   "liq": 783947,
-   "traders": 625
+   "liq": 768520,
+   "traders": 426
   },
   "0x07ebb29a38fbcb41563817e5e19f2cec619c90d2": {
    "symbol": "BUN",
@@ -205,8 +204,8 @@
    "how": "start",
    "added": null,
    "category": "agents",
-   "liq": 213152,
-   "traders": 66
+   "liq": 202229,
+   "traders": 95
   },
   "0x88ad8ddf1e3898412146a534538d418c6f8a9062": {
    "symbol": "STANDARD",
@@ -217,154 +216,148 @@
    "how": "start",
    "added": null,
    "category": "ecosystem",
-   "liq": 4053780,
-   "traders": 31
-  },
-  "0xe92906149fef3599175f6b3fca3e96954388fb46": {
-   "status": "watch",
-   "good": 2,
-   "since": "2026-11-25",
-   "symbol": "FIONA",
-   "name": "Fiona the Hippo",
-   "liq": 72936,
-   "traders": 1010,
-   "first": "2026-11-25"
+   "liq": 3944182,
+   "traders": 24
   },
   "0xc6911796042b15d7fa4f6cde69e245ddcd3d9c31": {
-   "status": "watch",
-   "good": 2,
-   "since": "2026-11-25",
+   "status": "warming",
+   "good": 0,
+   "since": "2026-11-27",
    "symbol": "VIRTUAL",
    "name": "Virtuals Protocol",
-   "liq": 2485869,
-   "traders": 639,
-   "first": "2026-07-04"
+   "liq": 2559453,
+   "traders": 748,
+   "first": "2026-07-04",
+   "how": "rule",
+   "bad": 0,
+   "at": [
+    27,
+    0
+   ],
+   "moved": "2026-11-27"
   },
   "0x0ddcab9ae04bda0c87ecc1640636fa11e8e613e8": {
    "symbol": "TEXEL",
    "name": "Texel",
-   "liq": 72535,
+   "liq": 67927,
    "status": "listed",
    "since": "2026-11-25",
    "how": "hand",
    "good": 0,
    "bad": 0,
    "added": "2026-11-25",
-   "traders": 1282
+   "traders": 952
   },
   "0xfce34d21a92069100e3226638140706cf03a266e": {
    "status": "watch",
-   "good": 2,
+   "good": 3,
    "since": "2026-11-25",
    "symbol": "GLDSTN",
    "name": "Goldstein",
-   "liq": 665898,
-   "traders": 165,
+   "liq": 798093,
+   "traders": 186,
    "first": "2026-09-14"
   },
   "0x28da843c0223990fb57701319b30804b89eff111": {
    "status": "watch",
-   "good": 2,
+   "good": 3,
    "since": "2026-11-25",
    "symbol": "GAS",
    "name": "GAS",
-   "liq": 65073,
-   "traders": 118,
+   "liq": 63365,
+   "traders": 104,
    "first": "2026-09-23"
   },
   "0x18e674231a58c239dc7daedcffe15ec3a24cff5c": {
-   "status": "watch",
-   "good": 2,
-   "since": "2026-11-25",
+   "status": "warming",
+   "good": 0,
+   "since": "2026-11-27",
    "symbol": "HOOKR",
    "name": "Hookr.fun",
-   "liq": 418064,
-   "traders": 406,
-   "first": "2026-08-06"
-  },
-  "0x99bf3583e6ee3a15f2057f84184f9e8286cdaae6": {
-   "status": "watch",
-   "good": 2,
-   "since": "2026-11-25",
-   "symbol": "PNCEO",
-   "name": "PennyCEO",
-   "liq": 98914,
-   "traders": 2091,
-   "first": "2026-11-26"
+   "liq": 413927,
+   "traders": 497,
+   "first": "2026-08-06",
+   "how": "rule",
+   "bad": 0,
+   "at": [
+    25,
+    0
+   ],
+   "moved": "2026-11-27"
   },
   "0xefc231c87b0eb98a79bf9e3566274f36f8773ff2": {
    "status": "watch",
-   "good": 1,
+   "good": 2,
    "since": "2026-11-26",
    "symbol": "mihao",
    "name": "ni hao cat",
-   "liq": 101510,
-   "traders": 1312,
+   "liq": 91713,
+   "traders": 1036,
    "first": "2026-11-26"
-  },
-  "0x0d3059739f0e2b41b405db75fc2b3a0cd782a49e": {
-   "status": "watch",
-   "good": 1,
-   "since": "2026-11-26",
-   "symbol": "Claude",
-   "name": "Claude",
-   "liq": 679549,
-   "traders": 224,
-   "first": "2026-11-26"
-  },
-  "0xf533cf0ee5a6cbd9d2474b81091014f5c7579032": {
-   "status": "watch",
-   "good": 1,
-   "since": "2026-11-26",
-   "symbol": "UHI",
-   "name": "Universal High Income",
-   "liq": 58878,
-   "traders": 1506,
-   "first": "2026-11-26"
-  },
-  "0xc9ba30bba4524dd9b70b0d8b49496845eec349b2": {
-   "status": "watch",
-   "good": 1,
-   "since": "2026-11-26",
-   "symbol": "JIMMY",
-   "name": "Jimmy Rustles",
-   "liq": 60126,
-   "traders": 1513,
-   "first": "2026-11-26"
-  },
-  "0x7f402d3d6391ed6041fbc9a689a1367e02c21182": {
-   "status": "watch",
-   "good": 1,
-   "since": "2026-11-26",
-   "symbol": "CBUCKS",
-   "name": "Cartoon Money",
-   "liq": 50019,
-   "traders": 935,
-   "first": "2026-11-26"
-  },
-  "0xddd4947010496b500abe96ab0965c38584413ba3": {
-   "status": "watch",
-   "good": 1,
-   "since": "2026-11-26",
-   "symbol": "Nautilo",
-   "name": "Nautilo",
-   "liq": 168925,
-   "traders": 270,
-   "first": "2026-09-17"
   },
   "0x51250b135174ca09450ec01c4aff73cf69dbb590": {
    "status": "watch",
-   "good": 1,
+   "good": 2,
    "since": "2026-11-26",
    "symbol": "NOVAAI",
    "name": "NovaAI",
-   "liq": 738454,
-   "traders": 236,
+   "liq": 744083,
+   "traders": 270,
    "first": "2026-08-19"
+  },
+  "0x0d5ae088e42ee50708d9da22a4d44d4e13dcb754": {
+   "status": "watch",
+   "good": 1,
+   "since": "2026-11-27",
+   "symbol": "Rizzmas",
+   "name": "Rizzmas",
+   "liq": 53885,
+   "traders": 1514,
+   "first": "2026-11-27"
+  },
+  "0x82b8e26e80d24948fd0da08ac7464299bb7260c8": {
+   "status": "watch",
+   "good": 1,
+   "since": "2026-11-27",
+   "symbol": "CINU",
+   "name": "Cate Inu",
+   "liq": 57687,
+   "traders": 1473,
+   "first": "2026-11-27"
+  },
+  "0xcf1efc969e5b3eb629cdf5b1d1208e2f53887e49": {
+   "status": "watch",
+   "good": 1,
+   "since": "2026-11-27",
+   "symbol": "PNAVL",
+   "name": "PennyAvalanche",
+   "liq": 77241,
+   "traders": 1123,
+   "first": "2026-11-27"
+  },
+  "0x7e8bdbdab6104d74f50b44471821a4e6b31a5cae": {
+   "status": "watch",
+   "good": 1,
+   "since": "2026-11-27",
+   "symbol": "QUIV",
+   "name": "Quiver",
+   "liq": 71536,
+   "traders": 924,
+   "first": "2026-11-27"
+  },
+  "0xaedb775a10c89a948415d062c09b852985b20553": {
+   "status": "watch",
+   "good": 1,
+   "since": "2026-11-27",
+   "symbol": "CIRRAVA",
+   "name": "CIRRAVA",
+   "liq": 67329,
+   "traders": 439,
+   "first": "2026-11-27"
   }
  },
  "stocks": {
-  "to": 124142240,
+  "to": 124672292,
   "tokens": {
    "0xc93a8c440cea26d7445df01729f193b27965099f": "WEEK",
    "0x322f0929c4625ed5bad873c95208d54e1c003b2d": "TSLA",
